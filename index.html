@@ -5,12 +5,58 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
     <meta name="theme-color" content="#08161b" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <title>RELIC HUNTER V0.1.0</title>
+    <title>RELIC HUNTER V0.1.2</title>
     <link rel="stylesheet" href="./src/style.css" />
   </head>
   <body>
+    <div id="boot-status">RELIC HUNTER<br><span>Đang tải game engine...</span></div>
     <div id="app"></div>
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
-    <script src="./public/main.js"></script>
+    <script>
+      (() => {
+        const status = document.getElementById('boot-status');
+        const sources = [
+          'https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js',
+          'https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js',
+          'https://unpkg.com/phaser@3.90.0/dist/phaser.min.js'
+        ];
+        let index = 0;
+
+        function fail(message) {
+          status.innerHTML = 'Không thể khởi động RELIC HUNTER<br><span>' + message + '</span>';
+          status.classList.add('boot-error');
+        }
+
+        function loadGame() {
+          status.querySelector('span').textContent = 'Đang khởi tạo gameplay...';
+          const script = document.createElement('script');
+          script.src = './public/main.js';
+          script.onload = () => setTimeout(() => status.remove(), 250);
+          script.onerror = () => fail('Không tải được public/main.js');
+          document.body.appendChild(script);
+        }
+
+        function loadPhaser() {
+          if (window.Phaser) return loadGame();
+          if (index >= sources.length) {
+            return fail('Không tải được Phaser. Kiểm tra kết nối Internet hoặc firewall/CDN.');
+          }
+          const src = sources[index++];
+          status.querySelector('span').textContent = 'Đang tải Phaser (' + index + '/' + sources.length + ')...';
+          const script = document.createElement('script');
+          script.src = src;
+          script.async = true;
+          script.onload = () => window.Phaser ? loadGame() : loadPhaser();
+          script.onerror = () => loadPhaser();
+          document.head.appendChild(script);
+        }
+
+        window.addEventListener('error', (event) => {
+          if (!document.getElementById('boot-status')) return;
+          fail('Lỗi JavaScript: ' + (event.message || 'Unknown error'));
+        });
+
+        loadPhaser();
+      })();
+    </script>
   </body>
 </html>
