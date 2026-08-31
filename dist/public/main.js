@@ -18,10 +18,38 @@ class AdventureScene extends Phaser.Scene{
   coins=0; checkpointX=120; chestOpened=false; portalUnlocked=false; bossActive=false; bossHP=900; bossPhase=1; bossBusy=false; bossNextAttack=0;
   enemies=[]; enemyId=0; miniBoss=null;
   constructor(){super('adventure')}
-  preload(){this.load.image('kaiConcept','./public/assets/reference/kai-concept.png')}
+  preload() {
+    this.load.image('kaiConcept', './public/assets/reference/kai-concept.png');
+    this.load.json('assetManifest', './public/assets/asset-manifest.json');
+
+    // Official asset slots.
+    // Các file này có thể chưa tồn tại ở V0.4.2; fallback sẽ tự dùng runtime textures.
+    this.officialAssetSlots = {
+      kaiIdle: './public/assets/characters/kai/kai-idle.png',
+      kaiRun: './public/assets/characters/kai/kai-run.png',
+      kaiJump: './public/assets/characters/kai/kai-jump.png',
+      kaiFall: './public/assets/characters/kai/kai-fall.png',
+      kaiAttack1: './public/assets/characters/kai/kai-attack-1.png',
+      kaiAttack2: './public/assets/characters/kai/kai-attack-2.png',
+      kaiAttack3: './public/assets/characters/kai/kai-attack-3.png',
+      kaiDash: './public/assets/characters/kai/kai-dash.png',
+      kaiSkill: './public/assets/characters/kai/kai-skill.png',
+      kaiHurt: './public/assets/characters/kai/kai-hurt.png',
+      kaiDeath: './public/assets/characters/kai/kai-death.png'
+    };
+
+    Object.entries(this.officialAssetSlots).forEach(([key, path]) => {
+      this.load.image(key, path);
+    });
+
+    this.load.on('loaderror', (file) => {
+      // Không chặn boot khi asset chính thức chưa có.
+      console.warn('[Asset Slot Missing] fallback runtime texture:', file?.key || file?.src || file);
+    });
+  }
   create(){
     this.input.addPointer(4); this.cameras.main.setBackgroundColor(C.bg); this.physics.world.setBounds(0,0,WORLD_W,H);
-    this.createTextures(); this.createWorld(); this.createPlayer(); this.createEnemies(); this.createBoss(); this.createUI(); this.setupInput();
+    this.createTextures(); this.setupOfficialKaiSprites(); this.createWorld(); this.createAmbientPolish(); this.createPlayer(); this.createEnemies(); this.createBoss(); this.createUI(); this.setupInput();
     this.cameras.main.startFollow(this.player,true,0.08,0.08); this.cameras.main.setBounds(0,0,WORLD_W,H); this.cameras.main.setDeadzone(240,110);
     this.physics.add.collider(this.player,this.ground);
     for(const e of this.enemies){this.physics.add.collider(e.sprite,this.ground); this.physics.add.overlap(this.player,e.sprite,()=>this.contactDamage(e.sprite,e.damage));}
@@ -114,6 +142,19 @@ class AdventureScene extends Phaser.Scene{
     makeKai('kai_skill',{sword:'skill',lean:3,scf:1.55});
     g.fillStyle(C.dark).fillRoundedRect(4,12,44,64,12); g.fillStyle(C.cream).fillCircle(26,18,12); g.fillStyle(0x1d2428).fillCircle(26,14,13); g.fillStyle(C.cyan2).fillTriangle(12,32,42,32,8,58); g.fillStyle(C.bronze).fillRoundedRect(4,31,10,30,4); g.fillStyle(C.cyan).fillRect(39,28,5,42); g.generateTexture('kai',52,80); g.clear();
 
+    // Official-style small HUD portrait for V0.4.2.
+    g.fillStyle(0x061015,1).fillRoundedRect(0,0,74,74,16);
+    g.lineStyle(3,C.cyan,0.75).strokeRoundedRect(3,3,68,68,14);
+    g.fillStyle(0x0e3035,1).fillCircle(37,37,29);
+    g.fillStyle(C.cyan2,0.9).fillTriangle(17,48,56,48,12,72);
+    g.fillStyle(C.cream,1).fillCircle(37,29,14);
+    g.fillStyle(0x172126,1).fillCircle(35,22,15);
+    g.fillTriangle(22,22,32,4,39,24); g.fillTriangle(37,19,54,8,50,29);
+    g.fillStyle(C.bronze,1).fillCircle(55,47,6);
+    g.fillStyle(C.cyan,1).fillCircle(55,47,3);
+    g.fillStyle(0x07171b,1).fillCircle(43,30,2);
+    g.generateTexture('kaiPortrait',74,74); g.clear();
+
     // Updated creature silhouettes with small idle-readable details.
     g.fillStyle(0x142527,0.55).fillEllipse(34,43,74,14);
     g.fillStyle(0x365c52).fillEllipse(34,28,66,45);
@@ -166,6 +207,35 @@ class AdventureScene extends Phaser.Scene{
     }
     g.destroy();
   }
+
+  setupOfficialKaiSprites(){
+    const pick=(slot,fallback)=>this.textures.exists(slot)?slot:fallback;
+    this.kaiTex={
+      idle:pick('kaiIdle','kai_idle_0'),
+      idle2:pick('kaiIdle','kai_idle_1'),
+      run:pick('kaiRun','kai_run_0'),
+      runFrames:this.textures.exists('kaiRun')?['kaiRun']:['kai_run_0','kai_run_1','kai_run_2','kai_run_3'],
+      jump:pick('kaiJump','kai_jump'),
+      fall:pick('kaiFall','kai_fall'),
+      attack1:pick('kaiAttack1','kai_attack_1'),
+      attack2:pick('kaiAttack2','kai_attack_2'),
+      attack3:pick('kaiAttack3','kai_attack_3'),
+      dash:pick('kaiDash','kai_dash'),
+      skill:pick('kaiSkill','kai_skill'),
+      hurt:pick('kaiHurt','kai_hurt'),
+      death:pick('kaiDeath','kai_death')
+    };
+    this.kaiOfficialActive = this.textures.exists('kaiIdle') || this.textures.exists('kaiRun') || this.textures.exists('kaiAttack1');
+  }
+
+  setKaiTexture(key){
+    if(!this.player) return;
+    if(key && key!==this.lastTexture){
+      this.player.setTexture(key);
+      this.lastTexture=key;
+    }
+  }
+
   createWorld(){
     // Layered dark-fantasy forest: silhouettes, ruins, mist, and teal relic glows.
     for(let i=0;i<36;i++){
@@ -199,14 +269,34 @@ class AdventureScene extends Phaser.Scene{
       if(i%5===0) this.add.circle(x+8,y+8,3,C.cyan,0.22);
     }
     this.add.text(70,105,'WHISPERING FOREST',{fontSize:'22px',fontStyle:'bold',color:'#8ff8f0'});
-    this.add.text(70,133,'Relic System Prototype',{fontSize:'13px',color:'#8aa9a7'});
+    this.add.text(70,133,'KAI Official Sprite Integration • Visual Foundation',{fontSize:'13px',color:'#8aa9a7'});
     this.checkpoint=this.add.container(1760,590);this.checkpoint.add(this.add.rectangle(0,0,18,95,C.cyan2,0.7));this.checkpoint.add(this.add.circle(0,-52,18,C.cyan,0.8));this.checkpoint.add(this.add.text(0,36,'CHECKPOINT',{fontSize:'12px',color:'#9ff'}).setOrigin(0.5));
     this.tweens.add({targets:this.checkpoint.list[1],scale:1.2,alpha:0.55,yoyo:true,repeat:-1,duration:850});
     this.chest=this.physics.add.staticSprite(2600,FLOOR_TOP-36,'chest');
     this.portal=this.add.container(4100,FLOOR_TOP-86).setVisible(false); const ring=this.add.circle(0,0,62,C.cyan,0.13).setStrokeStyle(7,C.cyan,0.8); const core=this.add.circle(0,0,32,C.cyan2,0.45); this.portal.add([ring,core,this.add.text(0,88,'EXIT PORTAL',{fontSize:'14px',color:'#bff'}).setOrigin(0.5)]); this.tweens.add({targets:core,scale:1.2,alpha:0.75,yoyo:true,repeat:-1,duration:700});
     this.physics.add.overlap(this.player??this.add.zone(-999,-999,1,1),this.chest,()=>{});
   }
-  createPlayer(){this.player=this.physics.add.sprite(120,FLOOR_TOP-38,'kai_idle_0').setCollideWorldBounds(true).setDragX(1600).setMaxVelocity(520,900);this.player.body.setSize(38,68).setOffset(29,18);this.animLockUntil=0;this.hurtUntil=0;this.lastTexture='kai_idle_0'}
+  createAmbientPolish(){
+    // V0.4.2 KAI Official Sprite Integration: lightweight runtime atmosphere.
+    this.add.rectangle(WORLD_W/2, 0, WORLD_W, H, 0x031013, 0.16).setOrigin(0.5,0).setScrollFactor(0.12).setDepth(-8);
+    for(let i=0;i<34;i++){
+      const x=Phaser.Math.Between(120,WORLD_W-120);
+      const y=Phaser.Math.Between(120,FLOOR_TOP-90);
+      const p=this.add.circle(x,y,Phaser.Math.Between(2,5),C.cyan,Phaser.Math.FloatBetween(0.08,0.22)).setDepth(-1).setScrollFactor(Phaser.Math.FloatBetween(0.55,0.9));
+      this.tweens.add({targets:p,y:y-Phaser.Math.Between(18,46),alpha:Phaser.Math.FloatBetween(0.02,0.14),duration:Phaser.Math.Between(1800,3600),yoyo:true,repeat:-1,delay:Phaser.Math.Between(0,1200)});
+    }
+    for(let i=0;i<9;i++){
+      const x=Phaser.Math.Between(260,WORLD_W-260);
+      const beam=this.add.rectangle(x,335,18,430,C.cyan,0.035).setAngle(Phaser.Math.Between(-8,8)).setDepth(-2).setScrollFactor(0.35);
+      this.tweens.add({targets:beam,alpha:0.075,duration:2200+i*110,yoyo:true,repeat:-1});
+    }
+    for(let i=0;i<14;i++){
+      const x=Phaser.Math.Between(220,WORLD_W-220);
+      const relic=this.add.rectangle(x, FLOOR_TOP-Phaser.Math.Between(25,72), 8, 14, C.cyan, 0.16).setAngle(45).setDepth(1);
+      this.tweens.add({targets:relic,alpha:0.36,scale:1.25,duration:900+Phaser.Math.Between(0,800),yoyo:true,repeat:-1});
+    }
+  }
+  createPlayer(){this.player=this.physics.add.sprite(120,FLOOR_TOP-38,this.kaiTex.idle).setCollideWorldBounds(true).setDragX(1600).setMaxVelocity(520,900);this.player.body.setSize(38,68).setOffset(29,18);this.animLockUntil=0;this.hurtUntil=0;this.lastTexture=this.kaiTex.idle}
   spawnEnemy(x,type='slime'){const elite=type==='elite';const y=elite?FLOOR_TOP-40:FLOOR_TOP-21;const s=this.physics.add.sprite(x,y,elite?'elite':'slime').setCollideWorldBounds(true).setDragX(900).setBounce(0.02);s.body.setSize(elite?70:54,elite?70:34).setOffset(elite?13:7,elite?18:14);const e={id:++this.enemyId,sprite:s,type,hp:elite?170:65,maxHp:elite?170:65,damage:elite?12:7,speed:elite?85:65,active:true,floorY:y};this.enemies.push(e);return e}
   createEnemies(){[650,1040,1280,2050,2300,3150].forEach(x=>this.spawnEnemy(x));this.miniBoss=this.spawnEnemy(2850,'elite')}
   createBoss(){this.boss=this.physics.add.sprite(3820,FLOOR_TOP-62,'boss').setVisible(false).setActive(false).setCollideWorldBounds(true);this.boss.body.setSize(96,104).setOffset(20,18);this.boss.body.enable=false}
@@ -215,7 +305,8 @@ class AdventureScene extends Phaser.Scene{
     this.isMobileUI = this.detectMobileUI();
     const ui=this.add.container(0,0).setScrollFactor(0).setDepth(100);
     ui.add(this.add.rectangle(18,18,350,62,0x061015,0.82).setOrigin(0));
-    ui.add(this.add.text(34,27,'KAI',{fontSize:'16px',fontStyle:'bold',color:'#d8fffc'}));
+    ui.add(this.add.image(47,49,'kaiPortrait').setDisplaySize(48,48));
+    ui.add(this.add.text(82,27,'KAI',{fontSize:'16px',fontStyle:'bold',color:'#d8fffc'}));
     this.hpBar=this.add.graphics();ui.add(this.hpBar);
     this.objective=this.add.text(28,94,'OBJECTIVE: Reach the Forest Guardian',{fontSize:'16px',color:'#d8fffc',backgroundColor:'#061015aa',padding:{x:12,y:8}});ui.add(this.objective);
     this.relicHud=this.add.container(28,140);
@@ -334,25 +425,27 @@ class AdventureScene extends Phaser.Scene{
   update(time){if(this.ended){if(this.keys&&Phaser.Input.Keyboard.JustDown(this.keys.restart))this.scene.restart();return}if(this.relicChoiceOpen){this.handleRelicChoiceKeys();this.updateControlCooldowns(time);this.drawUI();return}this.handlePlayer(time);this.updatePlayerVisual(time);this.updateEnemies();this.keepActorsAboveFloor();this.updateAdventure(time);this.updateBoss(time);this.drawUI();this.updateControlCooldowns(time);const rem=Math.max(0,this.skillReadyAt-time);if(this.skillText)this.skillText.setText(rem<=0?'Skill READY':`Skill ${(rem/1000).toFixed(1)}s`)}
   handleRelicChoiceKeys(){if(!this.keys||!this.relicChoiceOpen||!this.relicChoices)return;let idx=-1;if(Phaser.Input.Keyboard.JustDown(this.keys.choice1))idx=0;else if(Phaser.Input.Keyboard.JustDown(this.keys.choice2))idx=1;else if(Phaser.Input.Keyboard.JustDown(this.keys.choice3))idx=2;if(idx>=0&&this.relicChoices[idx]){const c=this.relicChoices[idx];this.selectRelic(c.id,c.source);}}
   handlePlayer(time){const b=this.player.body,left=this.joystickX<-.25||this.keys?.left.isDown||this.keys?.left2.isDown,right=this.joystickX>.25||this.keys?.right.isDown||this.keys?.right2.isDown;if(!this.isDashing){if(left){this.player.setVelocityX(-250);this.facing=-1;this.player.setFlipX(true)}else if(right){this.player.setVelocityX(250);this.facing=1;this.player.setFlipX(false)}else this.player.setVelocityX(0)}if(this.consume('jump',this.keys?.jump)&&b.blocked.down)this.player.setVelocityY(-510);if(this.consume('dash',this.keys?.dash)&&this.canDash)this.doDash(time);if(this.consume('attack',this.keys?.attack)&&this.canAttack)this.attack(time);if(this.consume('skill',this.keys?.skill)&&time>=this.skillReadyAt)this.skill(time)}
-  doDash(time){const cd=this.getDashCooldown(),speed=this.hasRelic('wind_step')?760:650;this.canDash=false;this.dashReadyAt=time+cd;this.isDashing=true;this.invincibleUntil=time+190;this.animLockUntil=time+210;this.player.setTexture('kai_dash');this.player.setVelocityX(this.facing*speed).setTint(C.cyan);this.createDashTrail();if(this.hasRelic('thunder_dash')){this.applyThunderDash();this.time.delayedCall(110,()=>this.applyThunderDash());this.time.delayedCall(210,()=>this.applyThunderDash());}this.time.delayedCall(190,()=>{this.isDashing=false;this.player.clearTint()});this.time.delayedCall(cd,()=>this.canDash=true)}
-  attack(time){this.canAttack=false;if(time>this.comboExpire)this.attackStep=0;this.attackStep=this.attackStep%3+1;this.comboExpire=time+520;const atkCd=this.attackStep===3?280:185;this.attackReadyAt=time+atkCd;this.animLockUntil=time+(this.attackStep===3?260:180);this.player.setTexture(`kai_attack_${this.attackStep}`);let dmg=[0,12,15,25][this.attackStep];if(this.hasRelic('heavy_impact')&&this.attackStep===3)dmg+=18;const reach=this.attackStep===3?105:82;this.fxSlash(this.player.x+this.facing*55,this.player.y-5,this.attackStep===3?1.3:1);for(const e of this.enemies){if(e.active&&Phaser.Math.Distance.Between(this.player.x,this.player.y,e.sprite.x,e.sprite.y)<reach+45){this.hitEnemy(e,dmg);if(this.hasRelic('fire_blade')&&Math.random()<0.35)this.applyBurn(e);if(this.hasRelic('heavy_impact')&&this.attackStep===3)this.bindEnemy(e,700);}}if(this.bossActive&&this.boss.active&&Phaser.Math.Distance.Between(this.player.x,this.player.y,this.boss.x,this.boss.y)<reach+100){this.hitBoss(dmg);if(this.hasRelic('fire_blade')&&Math.random()<0.35)this.applyBossBurn();if(this.hasRelic('heavy_impact')&&this.attackStep===3)this.bossSlowUntil=this.time.now+650;}this.time.delayedCall(atkCd,()=>this.canAttack=true)}
-  skill(time){const cd=this.getSkillCooldown();this.skillReadyAt=time+cd;this.animLockUntil=time+360;this.player.setTexture('kai_skill');this.createSkillBurst(this.player.x+this.facing*50,this.player.y);const surge=this.hasRelic('relic_surge'),root=this.hasRelic('root_prison');const wave=this.physics.add.sprite(this.player.x+this.facing*55,this.player.y-6,'slash').setScale(surge?1.75:1.4,surge?2.95:2.5).setTint(root?0x6fff9a:0x8effff);wave.body.setAllowGravity(false);wave.setVelocityX(this.facing*(surge?820:720));const ev=this.time.addEvent({delay:35,repeat:22,callback:()=>{if(!wave.active)return;for(const e of this.enemies){if(e.active&&Phaser.Math.Distance.Between(wave.x,wave.y,e.sprite.x,e.sprite.y)<(surge?92:75)){this.hitEnemy(e,surge?48:34);if(root)this.bindEnemy(e,1800);wave.destroy();return}}if(this.bossActive&&this.boss.active&&Phaser.Math.Distance.Between(wave.x,wave.y,this.boss.x,this.boss.y)<(surge?130:110)){this.hitBoss(surge?48:34);if(root){this.bossSlowUntil=this.time.now+1800;this.createRootFx(this.boss.x,this.boss.y+42);}wave.destroy()}}});this.time.delayedCall(1050,()=>{ev.remove();if(wave.active)wave.destroy()})}
+  doDash(time){const cd=this.getDashCooldown(),speed=this.hasRelic('wind_step')?760:650;this.canDash=false;this.dashReadyAt=time+cd;this.isDashing=true;this.invincibleUntil=time+190;this.animLockUntil=time+210;this.setKaiTexture(this.kaiTex.dash);this.player.setVelocityX(this.facing*speed).setTint(C.cyan);this.createDashTrail();if(this.hasRelic('thunder_dash')){this.applyThunderDash();this.time.delayedCall(110,()=>this.applyThunderDash());this.time.delayedCall(210,()=>this.applyThunderDash());}this.time.delayedCall(190,()=>{this.isDashing=false;this.player.clearTint()});this.time.delayedCall(cd,()=>this.canDash=true)}
+  attack(time){this.canAttack=false;if(time>this.comboExpire)this.attackStep=0;this.attackStep=this.attackStep%3+1;this.comboExpire=time+520;const atkCd=this.attackStep===3?280:185;this.attackReadyAt=time+atkCd;this.animLockUntil=time+(this.attackStep===3?260:180);this.setKaiTexture(this.kaiTex['attack'+this.attackStep]);let dmg=[0,12,15,25][this.attackStep];if(this.hasRelic('heavy_impact')&&this.attackStep===3)dmg+=18;const reach=this.attackStep===3?105:82;this.fxSlash(this.player.x+this.facing*55,this.player.y-5,this.attackStep===3?1.3:1);for(const e of this.enemies){if(e.active&&Phaser.Math.Distance.Between(this.player.x,this.player.y,e.sprite.x,e.sprite.y)<reach+45){this.hitEnemy(e,dmg);if(this.hasRelic('fire_blade')&&Math.random()<0.35)this.applyBurn(e);if(this.hasRelic('heavy_impact')&&this.attackStep===3)this.bindEnemy(e,700);}}if(this.bossActive&&this.boss.active&&Phaser.Math.Distance.Between(this.player.x,this.player.y,this.boss.x,this.boss.y)<reach+100){this.hitBoss(dmg);if(this.hasRelic('fire_blade')&&Math.random()<0.35)this.applyBossBurn();if(this.hasRelic('heavy_impact')&&this.attackStep===3)this.bossSlowUntil=this.time.now+650;}this.time.delayedCall(atkCd,()=>this.canAttack=true)}
+  skill(time){const cd=this.getSkillCooldown();this.skillReadyAt=time+cd;this.animLockUntil=time+360;this.setKaiTexture(this.kaiTex.skill);this.createSkillBurst(this.player.x+this.facing*50,this.player.y);const surge=this.hasRelic('relic_surge'),root=this.hasRelic('root_prison');const wave=this.physics.add.sprite(this.player.x+this.facing*55,this.player.y-6,'slash').setScale(surge?1.75:1.4,surge?2.95:2.5).setTint(root?0x6fff9a:0x8effff);wave.body.setAllowGravity(false);wave.setVelocityX(this.facing*(surge?820:720));const ev=this.time.addEvent({delay:35,repeat:22,callback:()=>{if(!wave.active)return;for(const e of this.enemies){if(e.active&&Phaser.Math.Distance.Between(wave.x,wave.y,e.sprite.x,e.sprite.y)<(surge?92:75)){this.hitEnemy(e,surge?48:34);if(root)this.bindEnemy(e,1800);wave.destroy();return}}if(this.bossActive&&this.boss.active&&Phaser.Math.Distance.Between(wave.x,wave.y,this.boss.x,this.boss.y)<(surge?130:110)){this.hitBoss(surge?48:34);if(root){this.bossSlowUntil=this.time.now+1800;this.createRootFx(this.boss.x,this.boss.y+42);}wave.destroy()}}});this.time.delayedCall(1050,()=>{ev.remove();if(wave.active)wave.destroy()})}
   fxSlash(x,y,s=1){const q=this.add.sprite(x,y,'slash').setScale(s,1.5*s).setTint(C.cyan).setAlpha(.85);const arc=this.add.graphics({x,y}).setDepth(11);arc.lineStyle(6*s,0x8effff,.9);arc.beginPath();arc.arc(0,0,58*s,this.facing>0?-0.8:Math.PI-0.8,this.facing>0?0.8:Math.PI+0.8,false);arc.strokePath();arc.lineStyle(2*s,0xffffff,.85);arc.beginPath();arc.arc(0,0,70*s,this.facing>0?-0.55:Math.PI-0.55,this.facing>0?0.55:Math.PI+0.55,false);arc.strokePath();this.tweens.add({targets:q,alpha:0,scaleX:s*1.4,duration:120,onComplete:()=>q.destroy()});this.tweens.add({targets:arc,alpha:0,scale:1.25,duration:160,onComplete:()=>arc.destroy()})}
-  hitEnemy(e,dmg){if(!e.active)return;e.hp-=dmg;e.sprite.setTint(0xffffff);this.cameras.main.shake(45,.0025);this.time.delayedCall(70,()=>e.active&&e.sprite.clearTint());if(e.hp<=0){e.active=false;e.sprite.disableBody(true,true);this.coins+=e.type==='elite'?30:10;this.spawnCoinText(e.sprite.x,e.sprite.y,e.type==='elite'?30:10);if(this.hasRelic('blood_pact'))this.healPlayer(e.type==='elite'?18:8);if(e.type==='elite'){this.flash('ELITE DEFEATED • RELIC FOUND',900);if(!this.eliteRelicDropped){this.eliteRelicDropped=true;this.time.delayedCall(420,()=>this.showRelicChoices('elite'));}}}}
+  hitEnemy(e,dmg){if(!e.active)return;e.hp-=dmg;e.sprite.setTint(0xffffff);this.cameras.main.shake(45,.0025);this.createImpactSpark(e.sprite.x,e.sprite.y-18,e.type==='elite'?C.gold:C.cyan);this.time.delayedCall(70,()=>e.active&&e.sprite.clearTint());if(e.hp<=0){e.active=false;e.sprite.disableBody(true,true);this.coins+=e.type==='elite'?30:10;this.spawnCoinText(e.sprite.x,e.sprite.y,e.type==='elite'?30:10);if(this.hasRelic('blood_pact'))this.healPlayer(e.type==='elite'?18:8);if(e.type==='elite'){this.flash('ELITE DEFEATED • RELIC FOUND',900);if(!this.eliteRelicDropped){this.eliteRelicDropped=true;this.time.delayedCall(420,()=>this.showRelicChoices('elite'));}}}}
   updatePlayerVisual(time){
-    if(this.ended){this.player.setTexture('kai_idle_0');return}
+    if(this.ended){this.setKaiTexture(this.kaiTex.death);return}
     this.player.setFlipX(this.facing<0);
     if(time<this.animLockUntil||time<this.hurtUntil)return;
     const b=this.player.body;
-    let tex='kai_idle_0';
-    if(!b.blocked.down) tex=b.velocity.y<0?'kai_jump':'kai_fall';
-    else if(Math.abs(b.velocity.x)>35) tex=`kai_run_${Math.floor(time/90)%4}`;
-    else tex=`kai_idle_${Math.floor(time/520)%2}`;
-    if(tex!==this.lastTexture){this.player.setTexture(tex);this.lastTexture=tex;}
+    let tex=this.kaiTex.idle;
+    if(!b.blocked.down) tex=b.velocity.y<0?this.kaiTex.jump:this.kaiTex.fall;
+    else if(Math.abs(b.velocity.x)>35){
+      const frames=this.kaiTex.runFrames||[this.kaiTex.run];
+      tex=frames[Math.floor(time/100)%frames.length];
+    } else tex=(Math.floor(time/520)%2===0)?this.kaiTex.idle:this.kaiTex.idle2;
+    this.setKaiTexture(tex);
   }
   createDashTrail(){
     for(let i=0;i<3;i++){
-      const ghost=this.add.image(this.player.x-this.facing*(18+i*18),this.player.y,`kai_run_${i%4}`).setAlpha(0.22-i*0.045).setTint(C.cyan).setFlipX(this.facing<0).setDepth(this.player.depth-1);
+      const ghost=this.add.image(this.player.x-this.facing*(18+i*18),this.player.y,(this.kaiTex.runFrames||[this.kaiTex.run])[i%((this.kaiTex.runFrames||[this.kaiTex.run]).length)]).setAlpha(0.22-i*0.045).setTint(C.cyan).setFlipX(this.facing<0).setDepth(this.player.depth-1);
       this.tweens.add({targets:ghost,alpha:0,x:ghost.x-this.facing*34,duration:220+i*40,onComplete:()=>ghost.destroy()});
     }
   }
@@ -364,16 +457,16 @@ class AdventureScene extends Phaser.Scene{
   updateEnemies(){for(const e of this.enemies){if(!e.active)continue;if(this.boundUntil[e.id]&&this.time.now<this.boundUntil[e.id]){e.sprite.setVelocityX(0);continue;}const d=this.player.x-e.sprite.x;if(Math.abs(d)<390)e.sprite.setVelocityX(Math.sign(d)*e.speed);else e.sprite.setVelocityX(0)}}
   keepActorsAboveFloor(){for(const e of this.enemies){if(!e.active)continue;if(e.sprite.y>e.floorY+4){e.sprite.setY(e.floorY);e.sprite.setVelocityY(0)}}if(this.boss&&this.boss.active&&this.boss.y>FLOOR_TOP-62){this.boss.setY(FLOOR_TOP-62);this.boss.setVelocityY(0)}}
   spawnCoinText(x,y,n){const t=this.add.text(x,y-40,`+${n} COIN`,{fontSize:'18px',fontStyle:'bold',color:'#ffd56a'}).setOrigin(.5);this.tweens.add({targets:t,y:y-85,alpha:0,duration:700,onComplete:()=>t.destroy()})}
-  updateAdventure(){if(this.player.x>1700&&this.checkpointX<1700){this.checkpointX=1760;this.playerHP=Math.min(100,this.playerHP+25);this.flash('CHECKPOINT ACTIVATED • HP RESTORED',950)}if(!this.chestOpened&&this.player.x>2500&&this.player.x<2700&&this.miniBoss&&!this.miniBoss.active){this.chestOpened=true;this.coins+=50;this.chest.setTint(0xffe08a);this.flash('TREASURE CHEST • +50 COIN',950)}if(!this.bossActive&&this.player.x>3500){this.startBoss()}if(this.portalUnlocked&&this.player.x>4020){this.ended=true;this.flash('WORLD 1 CLEAR\nAdventure Prototype Complete • Press R',999999)}}
+  updateAdventure(){if(this.player.x>1700&&this.checkpointX<1700){this.checkpointX=1760;this.playerHP=Math.min(100,this.playerHP+25);this.flash('CHECKPOINT ACTIVATED • HP RESTORED',950)}if(!this.chestOpened&&this.player.x>2500&&this.player.x<2700&&this.miniBoss&&!this.miniBoss.active){this.chestOpened=true;this.coins+=50;this.chest.setTint(0xffe08a);this.flash('TREASURE CHEST • +50 COIN',950)}if(!this.bossActive&&this.player.x>3500){this.startBoss()}if(this.portalUnlocked&&this.player.x>4020){this.ended=true;this.flash('WORLD 1 CLEAR\nKAI Official Sprite Integration Complete • Press R',999999)}}
   startBoss(){this.bossActive=true;this.boss.setVisible(true).setActive(true);this.boss.body.enable=true;this.bossLabel.setVisible(true);this.bossBar.setVisible(true);this.bossNextAttack=this.time.now+1200;this.objective.setText('OBJECTIVE: Defeat the Forest Guardian');this.flash('BOSS ENCOUNTER',900)}
   updateBoss(time){if(!this.bossActive||!this.boss.active||this.bossBusy)return;if(this.bossHP<=405&&this.bossPhase===1){this.bossPhase=2;this.boss.setTint(0xff7777);this.flash('PHASE 2 • RAGE',1000)}if(time<this.bossNextAttack)return;const c=Phaser.Math.Between(0,2);c===0?this.bossCharge():c===1?this.bossSlam():this.bossRoots();const slowed=time<this.bossSlowUntil;this.bossNextAttack=time+(this.bossPhase===1?(slowed?2750:2050):(slowed?2050:1450))}
   bossCharge(){this.bossBusy=true;const dir=Math.sign(this.player.x-this.boss.x)||-1,w=this.add.rectangle(this.boss.x+dir*220,625,380,38,C.warning,.25);this.tweens.add({targets:w,alpha:.7,yoyo:true,repeat:2,duration:120});this.time.delayedCall(540,()=>{w.destroy();this.boss.setVelocityX(dir*(this.bossPhase===1?480:620));this.time.delayedCall(450,()=>{this.boss.setVelocityX(0);this.bossBusy=false})})}
   bossSlam(){this.bossBusy=true;const z=this.add.circle(this.boss.x,640,150,C.warning,.18);this.tweens.add({targets:z,scale:1.15,alpha:.5,duration:500});this.time.delayedCall(600,()=>{this.cameras.main.shake(180,.008);if(Phaser.Math.Distance.Between(this.player.x,this.player.y,this.boss.x,this.boss.y)<180)this.takeDamage(this.bossPhase===1?18:24);z.destroy();this.time.delayedCall(350,()=>this.bossBusy=false)})}
   bossRoots(){this.bossBusy=true;const x=Phaser.Math.Clamp(this.player.x+Phaser.Math.Between(-80,80),3550,4230),w=this.add.rectangle(x,630,95,16,C.warning,.45);this.tweens.add({targets:w,alpha:.9,yoyo:true,repeat:3,duration:120});this.time.delayedCall(650,()=>{w.destroy();const r=this.add.rectangle(x,575,46,130,0x6f8f45).setOrigin(.5,1);if(Math.abs(this.player.x-x)<65)this.takeDamage(this.bossPhase===1?16:22);this.time.delayedCall(500,()=>r.destroy());this.time.delayedCall(680,()=>this.bossBusy=false)})}
-  hitBoss(dmg){this.bossHP=Math.max(0,this.bossHP-dmg);this.boss.setTint(0xffffff);this.cameras.main.shake(55,.003);this.time.delayedCall(70,()=>{if(this.boss.active)this.bossPhase===2?this.boss.setTint(0xff7777):this.boss.clearTint()});if(this.bossHP<=0){this.boss.disableBody(true,true);if(this.hasRelic('blood_pact'))this.healPlayer(35);if(!this.bossRelicDropped){this.bossRelicDropped=true;this.flash('BOSS DEFEATED • ANCIENT RELIC UNLOCKED',1100);this.time.delayedCall(550,()=>this.showRelicChoices('boss'));}else this.openPortalAfterRelic();}}
+  hitBoss(dmg){this.bossHP=Math.max(0,this.bossHP-dmg);this.boss.setTint(0xffffff);this.cameras.main.shake(55,.003);this.createImpactSpark(this.boss.x,this.boss.y-22,this.bossPhase===2?C.red:C.cyan);this.time.delayedCall(70,()=>{if(this.boss.active)this.bossPhase===2?this.boss.setTint(0xff7777):this.boss.clearTint()});if(this.bossHP<=0){this.boss.disableBody(true,true);if(this.hasRelic('blood_pact'))this.healPlayer(35);if(!this.bossRelicDropped){this.bossRelicDropped=true;this.flash('BOSS DEFEATED • ANCIENT RELIC UNLOCKED',1100);this.time.delayedCall(550,()=>this.showRelicChoices('boss'));}else this.openPortalAfterRelic();}}
   contactDamage(enemy,dmg){if(this.time.now<this.invincibleUntil)return;this.takeDamage(dmg);this.player.setVelocityX(Math.sign(this.player.x-enemy.x)*260);this.player.setVelocityY(-180)}
-  takeDamage(dmg){if(this.time.now<this.invincibleUntil||this.ended)return;if(this.hasRelic('guardian_shell'))dmg=Math.ceil(dmg*0.78);this.playerHP=Math.max(0,this.playerHP-dmg);this.invincibleUntil=this.time.now+700;this.hurtUntil=this.time.now+350;this.player.setTexture('kai_hurt');this.player.setTint(0xff7777);this.cameras.main.shake(100,.006);this.showDamageText(this.player.x,this.player.y-54,dmg,0xff6b6b,'-');this.time.delayedCall(150,()=>this.player.clearTint());if(this.playerHP<=0){this.player.setPosition(this.checkpointX,FLOOR_TOP-38);this.playerHP=100;this.invincibleUntil=this.time.now+1600;this.flash('KAI FALLEN • RESPAWN AT CHECKPOINT',1200)}}
-  drawUI(){this.hpBar.clear().fillStyle(0x183434,.95).fillRoundedRect(76,40,260,18,8).fillStyle(C.green,1).fillRoundedRect(76,40,260*(this.playerHP/100),18,8);this.coinText.setText(`COIN ${this.coins}`);this.bossBar.clear().fillStyle(0x26161a,.95).fillRoundedRect(W/2-280,50,560,16,8).fillStyle(C.red,1).fillRoundedRect(W/2-280,50,560*(this.bossHP/900),16,8);this.updateRelicHud()}
+  takeDamage(dmg){if(this.time.now<this.invincibleUntil||this.ended)return;if(this.hasRelic('guardian_shell'))dmg=Math.ceil(dmg*0.78);this.playerHP=Math.max(0,this.playerHP-dmg);this.invincibleUntil=this.time.now+700;this.hurtUntil=this.time.now+350;this.setKaiTexture(this.kaiTex.hurt);this.player.setTint(0xff7777);this.cameras.main.shake(100,.006);this.showDamageText(this.player.x,this.player.y-54,dmg,0xff6b6b,'-');this.time.delayedCall(150,()=>this.player.clearTint());if(this.playerHP<=0){this.player.setPosition(this.checkpointX,FLOOR_TOP-38);this.playerHP=100;this.invincibleUntil=this.time.now+1600;this.flash('KAI FALLEN • RESPAWN AT CHECKPOINT',1200)}}
+  drawUI(){this.hpBar.clear().fillStyle(0x183434,.95).fillRoundedRect(118,40,218,18,8).fillStyle(C.green,1).fillRoundedRect(118,40,218*(this.playerHP/100),18,8);this.coinText.setText(`COIN ${this.coins}`);this.bossBar.clear().fillStyle(0x26161a,.95).fillRoundedRect(W/2-280,50,560,16,8).fillStyle(C.red,1).fillRoundedRect(W/2-280,50,560*(this.bossHP/900),16,8);this.updateRelicHud()}
   hasRelic(id){return this.relics.includes(id)}
   getDashCooldown(){return this.hasRelic('wind_step')?560:780}
   getSkillCooldown(){return this.hasRelic('relic_surge')?3600:5000}
@@ -386,6 +479,31 @@ class AdventureScene extends Phaser.Scene{
   createBurnFx(x,y){const fx=this.add.circle(x,y-18,18,0xff7138,0.28).setDepth(14);this.tweens.add({targets:fx,scale:1.65,alpha:0,duration:360,onComplete:()=>fx.destroy()})}
   createLightningFx(x,y){const g=this.add.graphics({x,y}).setDepth(14);g.lineStyle(4,0x66e8ff,0.9);g.beginPath();g.moveTo(-28,-34);g.lineTo(0,-6);g.lineTo(-12,-3);g.lineTo(24,34);g.strokePath();this.tweens.add({targets:g,alpha:0,scale:1.25,duration:300,onComplete:()=>g.destroy()})}
   createRootFx(x,y){const g=this.add.graphics({x,y}).setDepth(13);g.lineStyle(5,0x7cf082,0.8);for(let i=-2;i<=2;i++){g.beginPath();g.moveTo(i*12,30);g.lineTo(i*8,-22);g.lineTo(i*18,-40);g.strokePath();}this.tweens.add({targets:g,alpha:0,y:y-12,duration:720,onComplete:()=>g.destroy()})}
+  createImpactSpark(x,y,color=C.cyan){
+    const g=this.add.graphics({x,y}).setDepth(18);
+    g.lineStyle(3,color,0.92);
+    for(let i=0;i<8;i++){
+      const a=(Math.PI*2/8)*i;
+      g.beginPath();
+      g.moveTo(Math.cos(a)*8,Math.sin(a)*8);
+      g.lineTo(Math.cos(a)*Phaser.Math.Between(22,42),Math.sin(a)*Phaser.Math.Between(22,42));
+      g.strokePath();
+    }
+    g.fillStyle(0xffffff,0.75).fillCircle(0,0,8);
+    this.tweens.add({targets:g,scale:1.3,alpha:0,duration:260,onComplete:()=>g.destroy()});
+  }
+  createRelicAcquireFx(color=C.cyan){
+    const x=W/2,y=H/2;
+    const g=this.add.graphics({x,y}).setScrollFactor(0).setDepth(340);
+    g.lineStyle(5,color,0.9).strokeCircle(0,0,42);
+    g.lineStyle(2,0xffffff,0.8).strokeCircle(0,0,68);
+    for(let i=0;i<12;i++){
+      const a=(Math.PI*2/12)*i;
+      g.lineStyle(2,color,0.65);
+      g.beginPath();g.moveTo(Math.cos(a)*76,Math.sin(a)*76);g.lineTo(Math.cos(a)*104,Math.sin(a)*104);g.strokePath();
+    }
+    this.tweens.add({targets:g,scale:1.45,alpha:0,duration:520,onComplete:()=>g.destroy()});
+  }
   chooseRelicPool(source){const owned=new Set(this.relics);let pool=RELICS.filter(r=>!owned.has(r.id));if(source==='boss'){pool=pool.sort((a,b)=>(a.id==='root_prison'?-1:b.id==='root_prison'?1:0));}
     const shuffled=pool.sort(()=>Math.random()-0.5);return shuffled.slice(0,Math.min(3,shuffled.length));}
   showRelicChoices(source='elite'){
@@ -420,7 +538,7 @@ class AdventureScene extends Phaser.Scene{
       layer.add(card);
     });
   }
-  selectRelic(id,source){if(!this.relicChoiceOpen||this.relics.includes(id))return;this.relics.push(id);const r=RELIC_BY_ID[id];this.flash(`${r.name.toUpperCase()} ACQUIRED`,900);if(this.relicLayer){this.relicLayer.destroy();this.relicLayer=null;}this.relicChoices=[];this.relicChoiceOpen=false;this.physics.world.resume();this.updateRelicHud(true);if(source==='boss')this.openPortalAfterRelic();}
+  selectRelic(id,source){if(!this.relicChoiceOpen||this.relics.includes(id))return;this.relics.push(id);const r=RELIC_BY_ID[id];this.flash(`${r.name.toUpperCase()} ACQUIRED`,900);this.createRelicAcquireFx(r.color);if(this.relicLayer){this.relicLayer.destroy();this.relicLayer=null;}this.relicChoices=[];this.relicChoiceOpen=false;this.physics.world.resume();this.updateRelicHud(true);if(source==='boss')this.openPortalAfterRelic();}
   openPortalAfterRelic(){this.portalUnlocked=true;this.portal.setVisible(true);this.objective.setText('OBJECTIVE: Enter the Exit Portal');this.flash('VICTORY • EXIT PORTAL OPENED',1300)}
   updateRelicHud(force=false){if(!this.relicHud)return;if(!force&&this._lastRelicCount===this.relics.length)return;this._lastRelicCount=this.relics.length;this.relicHud.removeAll(true);this.relicHud.add(this.add.rectangle(0,0,390,70,0x061015,0.46).setOrigin(0));this.relicHud.add(this.add.text(12,8,'RELIC BUILD',{fontSize:'12px',fontStyle:'bold',color:'#8ff8f0'}));if(!this.relics.length){this.relicHud.add(this.add.text(12,31,'Chưa có Relic • Hạ Elite để chọn sức mạnh đầu tiên',{fontSize:'12px',color:'#b7d4d2'}));return;}this.relics.slice(0,5).forEach((id,i)=>{const r=RELIC_BY_ID[id];this.relicHud.add(this.add.image(24+i*66,43,'relic_'+id).setDisplaySize(36,36));this.relicHud.add(this.add.text(43+i*66,54,r.icon,{fontSize:'14px'}).setOrigin(.5));});if(this.relics.length>5)this.relicHud.add(this.add.text(346,32,`+${this.relics.length-5}`,{fontSize:'16px',fontStyle:'bold',color:'#f4c76b'}));}
   flash(text,duration){this.status.setText(text).setVisible(true).setAlpha(1);if(duration<999999)this.tweens.add({targets:this.status,alpha:0,delay:duration,duration:280,onComplete:()=>this.status.setVisible(false)})}
