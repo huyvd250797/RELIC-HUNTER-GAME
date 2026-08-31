@@ -18,28 +18,167 @@ class AdventureScene extends Phaser.Scene{
   }
   createTextures(){
     const g=this.add.graphics();
+    const makeKai=(key,pose={})=>{
+      g.clear();
+      const cx=48, base=84;
+      const lean=pose.lean||0, bob=pose.bob||0;
+      const scarf=pose.scf||1;
+      const sword=pose.sword||'idle';
+      // transparent frame is intentionally larger so attack/dash poses do not jitter.
+      g.fillStyle(0x000000,0.18).fillEllipse(cx,base+5,42,10);
+      // legs
+      g.lineStyle(8,0x293038,1);
+      if(pose.dead){
+        g.lineStyle(9,0x293038,1); g.beginPath(); g.moveTo(30,70); g.lineTo(64,73); g.strokePath();
+        g.lineStyle(9,0x3d2a20,1); g.beginPath(); g.moveTo(62,73); g.lineTo(80,70); g.strokePath();
+      }else if(pose.run===1){
+        g.beginPath(); g.moveTo(cx-8,57+bob); g.lineTo(cx-24,82); g.moveTo(cx+8,58+bob); g.lineTo(cx+25,80); g.strokePath();
+      }else if(pose.run===2){
+        g.beginPath(); g.moveTo(cx-8,58+bob); g.lineTo(cx-2,84); g.moveTo(cx+8,58+bob); g.lineTo(cx+17,82); g.strokePath();
+      }else if(pose.jump){
+        g.beginPath(); g.moveTo(cx-8,57); g.lineTo(cx-18,78); g.moveTo(cx+8,57); g.lineTo(cx+15,76); g.strokePath();
+      }else{
+        g.beginPath(); g.moveTo(cx-8,57+bob); g.lineTo(cx-14,84); g.moveTo(cx+8,57+bob); g.lineTo(cx+12,84); g.strokePath();
+      }
+      // boots
+      g.fillStyle(0x6e492e,1).fillRoundedRect(cx-24,78,22,9,4).fillRoundedRect(cx+1,78,22,9,4);
+      // scarf / cloak
+      g.fillStyle(C.cyan2,1);
+      const tail=pose.dash?[-34,22,-10,48,-42,60]:[-30*scarf,28+bob,-10,47+bob,-36*scarf,55+bob];
+      g.fillTriangle(cx-10,30+bob,cx+tail[0],tail[1],cx+tail[4],tail[5]);
+      g.fillStyle(0x2ddad1,0.65).fillTriangle(cx-5,36+bob,cx-28*scarf,30+bob,cx-18*scarf,45+bob);
+      // torso and armor
+      g.fillStyle(C.dark,1).fillRoundedRect(cx-16+lean,28+bob,34,37,10);
+      g.fillStyle(C.cream,1).fillRoundedRect(cx-13+lean,29+bob,24,32,8);
+      g.fillStyle(0x5b3b28,1).fillRect(cx-16+lean,50+bob,36,7);
+      g.fillStyle(C.bronze,1).fillCircle(cx+17+lean,37+bob,8);
+      g.fillStyle(C.cyan,1).fillCircle(cx+17+lean,37+bob,3);
+      // arms
+      g.lineStyle(8,0x3b2a21,1);
+      if(sword==='attack1'){
+        g.beginPath(); g.moveTo(cx+10,42+bob); g.lineTo(cx+36,32+bob); g.strokePath();
+      }else if(sword==='attack2'){
+        g.beginPath(); g.moveTo(cx+9,42+bob); g.lineTo(cx+36,56+bob); g.strokePath();
+      }else if(sword==='attack3'||sword==='skill'){
+        g.beginPath(); g.moveTo(cx+8,42+bob); g.lineTo(cx+42,38+bob); g.strokePath();
+      }else if(pose.dead){
+        g.beginPath(); g.moveTo(cx-5,48); g.lineTo(cx-30,66); g.strokePath();
+      }else{
+        g.beginPath(); g.moveTo(cx+11,42+bob); g.lineTo(cx+28,53+bob); g.moveTo(cx-11,42+bob); g.lineTo(cx-25,53+bob); g.strokePath();
+      }
+      // head + hair
+      g.fillStyle(C.cream,1).fillCircle(cx+lean,20+bob,12);
+      g.fillStyle(0x182126,1).fillCircle(cx-2+lean,15+bob,13);
+      g.fillTriangle(cx-13+lean,14+bob,cx-4+lean,2+bob,cx+1+lean,16+bob);
+      g.fillTriangle(cx+2+lean,13+bob,cx+13+lean,4+bob,cx+10+lean,18+bob);
+      if(pose.hurt){g.fillStyle(0xff7373,0.9).fillCircle(cx+5+lean,20+bob,2)}
+      else {g.fillStyle(0x07171b,1).fillCircle(cx+4+lean,20+bob,2)}
+      // relic blade
+      const drawSword=(x1,y1,x2,y2,w=4)=>{g.lineStyle(w+4,0x0b2528,1);g.beginPath();g.moveTo(x1,y1);g.lineTo(x2,y2);g.strokePath();g.lineStyle(w,C.cyan,1);g.beginPath();g.moveTo(x1,y1);g.lineTo(x2,y2);g.strokePath();g.fillStyle(0xeaffff,0.95).fillCircle(x2,y2,2)};
+      if(sword==='attack1') drawSword(cx+34,32+bob,cx+74,18+bob,5);
+      else if(sword==='attack2') drawSword(cx+35,55+bob,cx+76,70+bob,5);
+      else if(sword==='attack3') drawSword(cx+40,39+bob,cx+87,39+bob,6);
+      else if(sword==='skill') drawSword(cx+40,38+bob,cx+85,22+bob,6);
+      else if(pose.dead) drawSword(cx+20,76,cx+74,78,3);
+      else drawSword(cx+27,53+bob,cx+52,78+bob,4);
+      g.generateTexture(key,96,96);
+      g.clear();
+    };
+
+    makeKai('kai_idle_0',{bob:0,scf:1});
+    makeKai('kai_idle_1',{bob:1,scf:1.08});
+    makeKai('kai_run_0',{run:1,bob:0,scf:1.2});
+    makeKai('kai_run_1',{run:2,bob:-1,scf:1.35});
+    makeKai('kai_run_2',{run:1,bob:0,scf:1.1});
+    makeKai('kai_run_3',{run:2,bob:1,scf:1.3});
+    makeKai('kai_jump',{jump:true,scf:1.25});
+    makeKai('kai_fall',{jump:true,bob:2,scf:1.05});
+    makeKai('kai_dash',{dash:true,lean:4,scf:1.6});
+    makeKai('kai_hurt',{hurt:true,lean:-2,scf:1});
+    makeKai('kai_death',{dead:true});
+    makeKai('kai_attack_1',{sword:'attack1',lean:2,scf:1.25});
+    makeKai('kai_attack_2',{sword:'attack2',lean:3,scf:1.2});
+    makeKai('kai_attack_3',{sword:'attack3',lean:4,scf:1.45});
+    makeKai('kai_skill',{sword:'skill',lean:3,scf:1.55});
     g.fillStyle(C.dark).fillRoundedRect(4,12,44,64,12); g.fillStyle(C.cream).fillCircle(26,18,12); g.fillStyle(0x1d2428).fillCircle(26,14,13); g.fillStyle(C.cyan2).fillTriangle(12,32,42,32,8,58); g.fillStyle(C.bronze).fillRoundedRect(4,31,10,30,4); g.fillStyle(C.cyan).fillRect(39,28,5,42); g.generateTexture('kai',52,80); g.clear();
-    g.fillStyle(0x365c52).fillEllipse(34,25,66,45); g.fillStyle(0x83c982).fillCircle(18,19,6); g.fillCircle(50,19,6); g.fillStyle(0xe6f8d4).fillCircle(18,19,2); g.fillCircle(50,19,2); g.generateTexture('slime',68,50); g.clear();
-    g.fillStyle(0x263d45).fillRoundedRect(10,12,76,80,18); g.fillStyle(C.cyan).fillCircle(30,38,7); g.fillCircle(66,38,7); g.fillStyle(C.bronze).fillRect(14,76,68,8); g.generateTexture('elite',96,96); g.clear();
-    g.fillStyle(0x34252d).fillRoundedRect(18,18,100,104,30); g.fillStyle(C.red2).fillTriangle(22,34,2,0,48,29); g.fillTriangle(114,34,134,0,88,29); g.fillStyle(C.red).fillCircle(46,55,8);g.fillCircle(90,55,8);g.fillStyle(0xeedec8).fillRect(32,86,70,9);g.generateTexture('boss',136,124);g.clear();
-    g.fillStyle(C.cyan).fillRoundedRect(0,0,80,10,5);g.generateTexture('slash',80,10);g.clear();
-    g.fillStyle(0x7b4a20).fillRect(5,16,80,54); g.fillStyle(C.gold).fillRect(10,8,70,14); g.fillStyle(C.gold).fillRect(39,33,12,15); g.generateTexture('chest',90,72);g.clear();
+
+    // Updated creature silhouettes with small idle-readable details.
+    g.fillStyle(0x142527,0.55).fillEllipse(34,43,74,14);
+    g.fillStyle(0x365c52).fillEllipse(34,28,66,45);
+    g.fillStyle(0x1d403c,1).fillTriangle(10,26,4,10,25,21); g.fillTriangle(58,26,65,10,43,21);
+    g.fillStyle(0x83c982).fillCircle(18,20,6); g.fillCircle(50,20,6);
+    g.fillStyle(0xe6f8d4).fillCircle(18,20,2); g.fillCircle(50,20,2);
+    g.lineStyle(2,C.cyan,.55); g.beginPath(); g.moveTo(22,34); g.lineTo(34,39); g.lineTo(46,34); g.strokePath();
+    g.generateTexture('slime',68,54); g.clear();
+
+    g.fillStyle(0x0b171a,0.28).fillEllipse(48,88,76,16);
+    g.fillStyle(0x263d45).fillRoundedRect(10,12,76,80,18);
+    g.fillStyle(0x12252a).fillTriangle(15,20,2,2,36,15); g.fillTriangle(80,20,94,2,60,15);
+    g.fillStyle(C.cyan).fillCircle(30,38,7); g.fillCircle(66,38,7);
+    g.fillStyle(C.bronze).fillRect(14,76,68,8);
+    g.lineStyle(4,C.cyan,.85); g.beginPath();g.moveTo(22,60);g.lineTo(48,68);g.lineTo(75,60);g.strokePath();
+    g.generateTexture('elite',96,96); g.clear();
+
+    g.fillStyle(0x0b171a,0.35).fillEllipse(68,120,132,22);
+    g.fillStyle(0x34252d).fillRoundedRect(18,18,100,104,30);
+    g.fillStyle(C.red2).fillTriangle(22,34,2,0,48,29); g.fillTriangle(114,34,134,0,88,29);
+    g.lineStyle(5,0x151013,1);g.beginPath();g.moveTo(24,20);g.lineTo(4,58);g.moveTo(112,20);g.lineTo(132,58);g.strokePath();
+    g.fillStyle(C.red).fillCircle(46,55,8); g.fillCircle(90,55,8);
+    g.fillStyle(C.cyan,0.75).fillCircle(68,76,7);
+    g.fillStyle(0xeedec8).fillRect(32,88,70,9);
+    g.generateTexture('boss',136,124); g.clear();
+
+    g.fillStyle(C.cyan).fillRoundedRect(0,0,80,10,5); g.generateTexture('slash',80,10); g.clear();
+    g.fillStyle(0x7b4a20).fillRect(5,16,80,54); g.fillStyle(C.gold).fillRect(10,8,70,14); g.fillStyle(C.gold).fillRect(39,33,12,15); g.generateTexture('chest',90,72); g.clear();
+
+    // Mobile action icons.
     g.lineStyle(7,0xffffff,1);g.beginPath();g.moveTo(16,46);g.lineTo(42,18);g.strokePath();g.fillStyle(0xffffff).fillTriangle(40,16,54,12,46,26);g.generateTexture('iconAttack',64,64);g.clear();
     g.lineStyle(7,0xffffff,1);g.beginPath();g.arc(30,34,17,3.7,6.4,false);g.strokePath();g.fillStyle(0xffffff).fillTriangle(44,18,57,25,46,31);g.generateTexture('iconSkill',64,64);g.clear();
     g.fillStyle(0xffffff).fillRoundedRect(10,38,18,6,3).fillRoundedRect(24,30,22,6,3).fillTriangle(45,19,58,25,46,31);g.generateTexture('iconDash',64,64);g.clear();
-    g.fillStyle(0xffffff).fillRect(29,18,6,24).fillTriangle(18,28,46,28,32,10);g.generateTexture('iconJump',64,64);g.clear(); g.destroy();
+    g.fillStyle(0xffffff).fillRect(29,18,6,24).fillTriangle(18,28,46,28,32,10);g.generateTexture('iconJump',64,64);g.clear();
+    g.destroy();
   }
   createWorld(){
-    for(let i=0;i<32;i++){const x=i*150+20,h=100+(i%6)*28;this.add.rectangle(x,570-h/2,110,h,i%2?0x0c272a:0x091f22).setScrollFactor(0.35);}
-    this.ground=this.physics.add.staticGroup(); const floor=this.add.rectangle(WORLD_W/2,676,WORLD_W,88,0x172a29);this.physics.add.existing(floor,true);this.ground.add(floor);
-    [[420,555,180],[900,520,170],[1360,565,190],[1810,510,190],[2380,555,190],[2920,525,210],[3450,560,180]].forEach(([x,y,w])=>{const p=this.add.rectangle(x,y,w,22,0x23423d);this.physics.add.existing(p,true);this.ground.add(p)});
+    // Layered dark-fantasy forest: silhouettes, ruins, mist, and teal relic glows.
+    for(let i=0;i<36;i++){
+      const x=i*140+20,h=110+(i%7)*30;
+      this.add.rectangle(x,570-h/2,120,h,i%2?0x0b2427:0x071c20).setScrollFactor(0.25).setAlpha(0.75);
+      if(i%3===0) this.add.circle(x+55,540-h,22,C.cyan,0.045).setScrollFactor(0.18);
+    }
+    for(let i=0;i<18;i++){
+      const x=i*260+80;
+      this.add.rectangle(x,470,18,260,0x123034,0.5).setScrollFactor(0.42);
+      this.add.triangle(x,320,x-58,475,x+58,475,0x123034,0.55).setScrollFactor(0.42);
+    }
+    for(let i=0;i<10;i++){
+      const x=i*420+260;
+      this.add.rectangle(x,438,58,150,0x1b302f,0.68).setScrollFactor(0.55);
+      this.add.rectangle(x,360,78,22,0x203b38,0.8).setScrollFactor(0.55);
+      this.add.circle(x,386,10,C.cyan,0.18).setScrollFactor(0.55);
+    }
+    this.add.circle(1120,120,84,0x85fff6,0.08).setScrollFactor(0.12);
+    this.ground=this.physics.add.staticGroup();
+    const floor=this.add.rectangle(WORLD_W/2,676,WORLD_W,88,0x172a29);
+    this.physics.add.existing(floor,true);this.ground.add(floor);
+    [[420,555,180],[900,520,170],[1360,565,190],[1810,510,190],[2380,555,190],[2920,525,210],[3450,560,180]].forEach(([x,y,w])=>{
+      const p=this.add.rectangle(x,y,w,22,0x23423d);
+      this.physics.add.existing(p,true);this.ground.add(p);
+      this.add.rectangle(x,y-15,w-22,4,C.cyan,0.13);
+    });
+    for(let i=0;i<46;i++){
+      const x=Phaser.Math.Between(80,WORLD_W-80), y=Phaser.Math.Between(505,650);
+      this.add.triangle(x,y,x-8,y+18,x+10,y+18,i%2?0x214d40:0x193a34,0.8);
+      if(i%5===0) this.add.circle(x+8,y+8,3,C.cyan,0.22);
+    }
     this.add.text(70,105,'WHISPERING FOREST',{fontSize:'22px',fontStyle:'bold',color:'#8ff8f0'});
+    this.add.text(70,133,'Visual & Animation Foundation',{fontSize:'13px',color:'#8aa9a7'});
     this.checkpoint=this.add.container(1760,590);this.checkpoint.add(this.add.rectangle(0,0,18,95,C.cyan2,0.7));this.checkpoint.add(this.add.circle(0,-52,18,C.cyan,0.8));this.checkpoint.add(this.add.text(0,36,'CHECKPOINT',{fontSize:'12px',color:'#9ff'}).setOrigin(0.5));
+    this.tweens.add({targets:this.checkpoint.list[1],scale:1.2,alpha:0.55,yoyo:true,repeat:-1,duration:850});
     this.chest=this.physics.add.staticSprite(2600,610,'chest');
     this.portal=this.add.container(4100,540).setVisible(false); const ring=this.add.circle(0,0,62,C.cyan,0.13).setStrokeStyle(7,C.cyan,0.8); const core=this.add.circle(0,0,32,C.cyan2,0.45); this.portal.add([ring,core,this.add.text(0,88,'EXIT PORTAL',{fontSize:'14px',color:'#bff'}).setOrigin(0.5)]); this.tweens.add({targets:core,scale:1.2,alpha:0.75,yoyo:true,repeat:-1,duration:700});
     this.physics.add.overlap(this.player??this.add.zone(-999,-999,1,1),this.chest,()=>{});
   }
-  createPlayer(){this.player=this.physics.add.sprite(120,590,'kai').setCollideWorldBounds(true).setDragX(1600).setMaxVelocity(520,900);this.player.body.setSize(38,68).setOffset(7,10)}
+  createPlayer(){this.player=this.physics.add.sprite(120,590,'kai_idle_0').setCollideWorldBounds(true).setDragX(1600).setMaxVelocity(520,900);this.player.body.setSize(38,68).setOffset(29,18);this.animLockUntil=0;this.hurtUntil=0;this.lastTexture='kai_idle_0'}
   spawnEnemy(x,type='slime'){const elite=type==='elite';const s=this.physics.add.sprite(x,elite?580:610,elite?'elite':'slime').setCollideWorldBounds(true);const e={id:++this.enemyId,sprite:s,type,hp:elite?170:65,maxHp:elite?170:65,damage:elite?12:7,speed:elite?85:65,active:true};this.enemies.push(e);return e}
   createEnemies(){[650,1040,1280,2050,2300,3150].forEach(x=>this.spawnEnemy(x));this.miniBoss=this.spawnEnemy(2850,'elite')}
   createBoss(){this.boss=this.physics.add.sprite(3820,555,'boss').setVisible(false).setActive(false).setCollideWorldBounds(true);this.boss.body.enable=false}
@@ -60,13 +199,35 @@ class AdventureScene extends Phaser.Scene{
   }
   updateJoy(p){const dx=p.x-130,dy=p.y-(H-118),d=Math.hypot(dx,dy)||1,m=Math.min(d,56);this.joy.knob.x=130+dx/d*m;this.joy.knob.y=H-118+dy/d*m;this.joystickX=Phaser.Math.Clamp((dx/d*m)/56,-1,1)} resetJoy(){this.joy.pointerId=null;this.joystickX=0;this.joy.knob.setPosition(130,H-118)}
   consume(field,key){const t=this.inputState[field];if(t)this.inputState[field]=false;return !!t||!!(key&&Phaser.Input.Keyboard.JustDown(key))}
-  update(time){if(this.ended){if(this.keys&&Phaser.Input.Keyboard.JustDown(this.keys.restart))this.scene.restart();return}this.handlePlayer(time);this.updateEnemies();this.updateAdventure(time);this.updateBoss(time);this.drawUI();const rem=Math.max(0,this.skillReadyAt-time);this.skillText.setText(rem<=0?'Skill READY':`Skill ${(rem/1000).toFixed(1)}s`)}
+  update(time){if(this.ended){if(this.keys&&Phaser.Input.Keyboard.JustDown(this.keys.restart))this.scene.restart();return}this.handlePlayer(time);this.updatePlayerVisual(time);this.updateEnemies();this.updateAdventure(time);this.updateBoss(time);this.drawUI();const rem=Math.max(0,this.skillReadyAt-time);this.skillText.setText(rem<=0?'Skill READY':`Skill ${(rem/1000).toFixed(1)}s`)}
   handlePlayer(time){const b=this.player.body,left=this.joystickX<-.25||this.keys?.left.isDown||this.keys?.left2.isDown,right=this.joystickX>.25||this.keys?.right.isDown||this.keys?.right2.isDown;if(!this.isDashing){if(left){this.player.setVelocityX(-250);this.facing=-1;this.player.setFlipX(true)}else if(right){this.player.setVelocityX(250);this.facing=1;this.player.setFlipX(false)}else this.player.setVelocityX(0)}if(this.consume('jump',this.keys?.jump)&&b.blocked.down)this.player.setVelocityY(-510);if(this.consume('dash',this.keys?.dash)&&this.canDash)this.doDash(time);if(this.consume('attack',this.keys?.attack)&&this.canAttack)this.attack(time);if(this.consume('skill',this.keys?.skill)&&time>=this.skillReadyAt)this.skill(time)}
-  doDash(time){this.canDash=false;this.isDashing=true;this.invincibleUntil=time+180;this.player.setVelocityX(this.facing*650).setTint(C.cyan);this.time.delayedCall(180,()=>{this.isDashing=false;this.player.clearTint()});this.time.delayedCall(780,()=>this.canDash=true)}
-  attack(time){this.canAttack=false;if(time>this.comboExpire)this.attackStep=0;this.attackStep=this.attackStep%3+1;this.comboExpire=time+520;const dmg=[0,12,15,25][this.attackStep],reach=this.attackStep===3?105:82;this.fxSlash(this.player.x+this.facing*55,this.player.y-5,this.attackStep===3?1.3:1);for(const e of this.enemies){if(e.active&&Phaser.Math.Distance.Between(this.player.x,this.player.y,e.sprite.x,e.sprite.y)<reach+45)this.hitEnemy(e,dmg)}if(this.bossActive&&this.boss.active&&Phaser.Math.Distance.Between(this.player.x,this.player.y,this.boss.x,this.boss.y)<reach+100)this.hitBoss(dmg);this.time.delayedCall(this.attackStep===3?280:185,()=>this.canAttack=true)}
-  skill(time){this.skillReadyAt=time+5000;const wave=this.physics.add.sprite(this.player.x+this.facing*55,this.player.y-6,'slash').setScale(1.4,2.5).setTint(0x8effff);wave.body.setAllowGravity(false);wave.setVelocityX(this.facing*720);const ev=this.time.addEvent({delay:35,repeat:22,callback:()=>{if(!wave.active)return;for(const e of this.enemies){if(e.active&&Phaser.Math.Distance.Between(wave.x,wave.y,e.sprite.x,e.sprite.y)<75){this.hitEnemy(e,34);wave.destroy();return}}if(this.bossActive&&this.boss.active&&Phaser.Math.Distance.Between(wave.x,wave.y,this.boss.x,this.boss.y)<110){this.hitBoss(34);wave.destroy()}}});this.time.delayedCall(1050,()=>{ev.remove();if(wave.active)wave.destroy()})}
-  fxSlash(x,y,s=1){const q=this.add.sprite(x,y,'slash').setScale(s,1.5*s).setTint(C.cyan).setAlpha(.85);this.tweens.add({targets:q,alpha:0,scaleX:s*1.4,duration:120,onComplete:()=>q.destroy()})}
+  doDash(time){this.canDash=false;this.isDashing=true;this.invincibleUntil=time+180;this.animLockUntil=time+190;this.player.setTexture('kai_dash');this.player.setVelocityX(this.facing*650).setTint(C.cyan);this.createDashTrail();this.time.delayedCall(180,()=>{this.isDashing=false;this.player.clearTint()});this.time.delayedCall(780,()=>this.canDash=true)}
+  attack(time){this.canAttack=false;if(time>this.comboExpire)this.attackStep=0;this.attackStep=this.attackStep%3+1;this.comboExpire=time+520;this.animLockUntil=time+(this.attackStep===3?260:180);this.player.setTexture(`kai_attack_${this.attackStep}`);const dmg=[0,12,15,25][this.attackStep],reach=this.attackStep===3?105:82;this.fxSlash(this.player.x+this.facing*55,this.player.y-5,this.attackStep===3?1.3:1);for(const e of this.enemies){if(e.active&&Phaser.Math.Distance.Between(this.player.x,this.player.y,e.sprite.x,e.sprite.y)<reach+45)this.hitEnemy(e,dmg)}if(this.bossActive&&this.boss.active&&Phaser.Math.Distance.Between(this.player.x,this.player.y,this.boss.x,this.boss.y)<reach+100)this.hitBoss(dmg);this.time.delayedCall(this.attackStep===3?280:185,()=>this.canAttack=true)}
+  skill(time){this.skillReadyAt=time+5000;this.animLockUntil=time+360;this.player.setTexture('kai_skill');this.createSkillBurst(this.player.x+this.facing*50,this.player.y);const wave=this.physics.add.sprite(this.player.x+this.facing*55,this.player.y-6,'slash').setScale(1.4,2.5).setTint(0x8effff);wave.body.setAllowGravity(false);wave.setVelocityX(this.facing*720);const ev=this.time.addEvent({delay:35,repeat:22,callback:()=>{if(!wave.active)return;for(const e of this.enemies){if(e.active&&Phaser.Math.Distance.Between(wave.x,wave.y,e.sprite.x,e.sprite.y)<75){this.hitEnemy(e,34);wave.destroy();return}}if(this.bossActive&&this.boss.active&&Phaser.Math.Distance.Between(wave.x,wave.y,this.boss.x,this.boss.y)<110){this.hitBoss(34);wave.destroy()}}});this.time.delayedCall(1050,()=>{ev.remove();if(wave.active)wave.destroy()})}
+  fxSlash(x,y,s=1){const q=this.add.sprite(x,y,'slash').setScale(s,1.5*s).setTint(C.cyan).setAlpha(.85);const arc=this.add.graphics({x,y}).setDepth(11);arc.lineStyle(6*s,0x8effff,.9);arc.beginPath();arc.arc(0,0,58*s,this.facing>0?-0.8:Math.PI-0.8,this.facing>0?0.8:Math.PI+0.8,false);arc.strokePath();arc.lineStyle(2*s,0xffffff,.85);arc.beginPath();arc.arc(0,0,70*s,this.facing>0?-0.55:Math.PI-0.55,this.facing>0?0.55:Math.PI+0.55,false);arc.strokePath();this.tweens.add({targets:q,alpha:0,scaleX:s*1.4,duration:120,onComplete:()=>q.destroy()});this.tweens.add({targets:arc,alpha:0,scale:1.25,duration:160,onComplete:()=>arc.destroy()})}
   hitEnemy(e,dmg){if(!e.active)return;e.hp-=dmg;e.sprite.setTint(0xffffff);this.cameras.main.shake(45,.0025);this.time.delayedCall(70,()=>e.active&&e.sprite.clearTint());if(e.hp<=0){e.active=false;e.sprite.disableBody(true,true);this.coins+=e.type==='elite'?30:10;this.spawnCoinText(e.sprite.x,e.sprite.y,e.type==='elite'?30:10);if(e.type==='elite')this.flash('ELITE DEFEATED • Chest route unlocked',900)}}
+  updatePlayerVisual(time){
+    if(this.ended){this.player.setTexture('kai_idle_0');return}
+    this.player.setFlipX(this.facing<0);
+    if(time<this.animLockUntil||time<this.hurtUntil)return;
+    const b=this.player.body;
+    let tex='kai_idle_0';
+    if(!b.blocked.down) tex=b.velocity.y<0?'kai_jump':'kai_fall';
+    else if(Math.abs(b.velocity.x)>35) tex=`kai_run_${Math.floor(time/90)%4}`;
+    else tex=`kai_idle_${Math.floor(time/520)%2}`;
+    if(tex!==this.lastTexture){this.player.setTexture(tex);this.lastTexture=tex;}
+  }
+  createDashTrail(){
+    for(let i=0;i<3;i++){
+      const ghost=this.add.image(this.player.x-this.facing*(18+i*18),this.player.y,`kai_run_${i%4}`).setAlpha(0.22-i*0.045).setTint(C.cyan).setFlipX(this.facing<0).setDepth(this.player.depth-1);
+      this.tweens.add({targets:ghost,alpha:0,x:ghost.x-this.facing*34,duration:220+i*40,onComplete:()=>ghost.destroy()});
+    }
+  }
+  createSkillBurst(x,y){
+    const burst=this.add.graphics({x,y}).setDepth(12);
+    burst.lineStyle(4,C.cyan,0.9);burst.strokeCircle(0,0,24);burst.lineStyle(2,0xeaffff,0.8);burst.strokeCircle(0,0,38);
+    this.tweens.add({targets:burst,scale:1.7,alpha:0,duration:360,onComplete:()=>burst.destroy()});
+  }
   updateEnemies(){for(const e of this.enemies){if(!e.active)continue;const d=this.player.x-e.sprite.x;if(Math.abs(d)<390)e.sprite.setVelocityX(Math.sign(d)*e.speed);else e.sprite.setVelocityX(0)}}
   spawnCoinText(x,y,n){const t=this.add.text(x,y-40,`+${n} COIN`,{fontSize:'18px',fontStyle:'bold',color:'#ffd56a'}).setOrigin(.5);this.tweens.add({targets:t,y:y-85,alpha:0,duration:700,onComplete:()=>t.destroy()})}
   updateAdventure(){if(this.player.x>1700&&this.checkpointX<1700){this.checkpointX=1760;this.playerHP=Math.min(100,this.playerHP+25);this.flash('CHECKPOINT ACTIVATED • HP RESTORED',950)}if(!this.chestOpened&&this.player.x>2500&&this.player.x<2700&&this.miniBoss&&!this.miniBoss.active){this.chestOpened=true;this.coins+=50;this.chest.setTint(0xffe08a);this.flash('TREASURE CHEST • +50 COIN',950)}if(!this.bossActive&&this.player.x>3500){this.startBoss()}if(this.portalUnlocked&&this.player.x>4020){this.ended=true;this.flash('WORLD 1 CLEAR\nAdventure Prototype Complete • Press R',999999)}}
@@ -77,7 +238,7 @@ class AdventureScene extends Phaser.Scene{
   bossRoots(){this.bossBusy=true;const x=Phaser.Math.Clamp(this.player.x+Phaser.Math.Between(-80,80),3550,4230),w=this.add.rectangle(x,630,95,16,C.warning,.45);this.tweens.add({targets:w,alpha:.9,yoyo:true,repeat:3,duration:120});this.time.delayedCall(650,()=>{w.destroy();const r=this.add.rectangle(x,575,46,130,0x6f8f45).setOrigin(.5,1);if(Math.abs(this.player.x-x)<65)this.takeDamage(this.bossPhase===1?16:22);this.time.delayedCall(500,()=>r.destroy());this.time.delayedCall(680,()=>this.bossBusy=false)})}
   hitBoss(dmg){this.bossHP=Math.max(0,this.bossHP-dmg);this.boss.setTint(0xffffff);this.cameras.main.shake(55,.003);this.time.delayedCall(70,()=>{if(this.boss.active)this.bossPhase===2?this.boss.setTint(0xff7777):this.boss.clearTint()});if(this.bossHP<=0){this.boss.disableBody(true,true);this.portalUnlocked=true;this.portal.setVisible(true);this.objective.setText('OBJECTIVE: Enter the Exit Portal');this.flash('VICTORY • EXIT PORTAL OPENED',1300)}}
   contactDamage(enemy,dmg){if(this.time.now<this.invincibleUntil)return;this.takeDamage(dmg);this.player.setVelocityX(Math.sign(this.player.x-enemy.x)*260);this.player.setVelocityY(-180)}
-  takeDamage(dmg){if(this.time.now<this.invincibleUntil||this.ended)return;this.playerHP=Math.max(0,this.playerHP-dmg);this.invincibleUntil=this.time.now+700;this.player.setTint(0xff7777);this.cameras.main.shake(100,.006);this.time.delayedCall(150,()=>this.player.clearTint());if(this.playerHP<=0){this.player.setPosition(this.checkpointX,560);this.playerHP=100;this.invincibleUntil=this.time.now+1600;this.flash('KAI FALLEN • RESPAWN AT CHECKPOINT',1200)}}
+  takeDamage(dmg){if(this.time.now<this.invincibleUntil||this.ended)return;this.playerHP=Math.max(0,this.playerHP-dmg);this.invincibleUntil=this.time.now+700;this.hurtUntil=this.time.now+350;this.player.setTexture('kai_hurt');this.player.setTint(0xff7777);this.cameras.main.shake(100,.006);this.time.delayedCall(150,()=>this.player.clearTint());if(this.playerHP<=0){this.player.setPosition(this.checkpointX,560);this.playerHP=100;this.invincibleUntil=this.time.now+1600;this.flash('KAI FALLEN • RESPAWN AT CHECKPOINT',1200)}}
   drawUI(){this.hpBar.clear().fillStyle(0x183434,.95).fillRoundedRect(76,40,260,18,8).fillStyle(C.green,1).fillRoundedRect(76,40,260*(this.playerHP/100),18,8);this.coinText.setText(`COIN ${this.coins}`);this.bossBar.clear().fillStyle(0x26161a,.95).fillRoundedRect(W/2-280,50,560,16,8).fillStyle(C.red,1).fillRoundedRect(W/2-280,50,560*(this.bossHP/900),16,8)}
   flash(text,duration){this.status.setText(text).setVisible(true).setAlpha(1);if(duration<999999)this.tweens.add({targets:this.status,alpha:0,delay:duration,duration:280,onComplete:()=>this.status.setVisible(false)})}
 }
