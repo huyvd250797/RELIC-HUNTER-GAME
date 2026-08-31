@@ -5,3 +5,27 @@ body { touch-action:none; overscroll-behavior:none; }
 canvas { display:block; margin:auto; }
 #rotate-hint { display:none; position:fixed; inset:0; z-index:9999; place-items:center; padding:32px; text-align:center; background:#061015; color:#fff; font-weight:700; }
 @media (orientation: portrait) and (max-width: 900px) { #rotate-hint { display:grid; } }
+#boot-status {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  gap: 10px;
+  background: radial-gradient(circle at center, #0c252a 0%, #061015 65%);
+  color: #dffffb;
+  font-size: clamp(24px, 4vw, 44px);
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+#boot-status span {
+  display: block;
+  margin-top: 14px;
+  color: #7bded8;
+  font-size: clamp(13px, 1.8vw, 18px);
+  font-weight: 600;
+  letter-spacing: normal;
+}
+#boot-status.boot-error { color: #ffd8d8; }
+#boot-status.boot-error span { color: #ff8f8f; max-width: 720px; padding: 0 24px; }
