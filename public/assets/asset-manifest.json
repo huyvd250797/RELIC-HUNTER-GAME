@@ -1,0 +1,77 @@
+{
+  "version": "0.4.2",
+  "pipeline": "KAI Official Sprite Integration",
+  "fallbackMode": "runtime_generated_textures",
+  "characters": {
+    "kai": {
+      "basePath": "public/assets/characters/kai",
+      "slots": {
+        "idle": "kai-idle.png",
+        "run": "kai-run.png",
+        "jump": "kai-jump.png",
+        "fall": "kai-fall.png",
+        "attack1": "kai-attack-1.png",
+        "attack2": "kai-attack-2.png",
+        "attack3": "kai-attack-3.png",
+        "dash": "kai-dash.png",
+        "skill": "kai-skill.png",
+        "hurt": "kai-hurt.png",
+        "death": "kai-death.png"
+      },
+      "integrated": true,
+      "spriteSize": "96x96",
+      "integrationNotes": "V0.4.2 includes first official PNG state sprites for KAI."
+    }
+  },
+  "enemies": {
+    "slime": {
+      "basePath": "public/assets/enemies/slime",
+      "slots": {
+        "idle": "slime-idle.png",
+        "move": "slime-move.png",
+        "hurt": "slime-hurt.png",
+        "death": "slime-death.png"
+      }
+    },
+    "elite": {
+      "basePath": "public/assets/enemies/elite",
+      "slots": {
+        "idle": "elite-idle.png",
+        "attack": "elite-attack.png",
+        "hurt": "elite-hurt.png",
+        "death": "elite-death.png"
+      }
+    }
+  },
+  "bosses": {
+    "forestGuardian": {
+      "basePath": "public/assets/bosses/forest-guardian",
+      "slots": {
+        "idle": "forest-guardian-idle.png",
+        "charge": "forest-guardian-charge.png",
+        "slam": "forest-guardian-slam.png",
+        "root": "forest-guardian-root.png",
+        "rage": "forest-guardian-rage.png",
+        "death": "forest-guardian-death.png"
+      }
+    }
+  },
+  "vfx": {
+    "slash": "public/assets/vfx/slash",
+    "dash": "public/assets/vfx/dash",
+    "hit": "public/assets/vfx/hit",
+    "relic": "public/assets/vfx/relic"
+  },
+  "ui": {
+    "icons": "public/assets/ui/icons",
+    "skills": "public/assets/ui/skills",
+    "relics": "public/assets/ui/relics"
+  },
+  "maps": {
+    "whisperingForest": {
+      "background": "public/assets/maps/whispering-forest/background",
+      "props": "public/assets/maps/whispering-forest/props",
+      "platforms": "public/assets/maps/whispering-forest/platforms"
+    }
+  }
+}

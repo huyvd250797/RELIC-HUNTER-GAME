@@ -21,4 +21,4 @@ http.createServer(async (req, res) => {
     res.writeHead(404, { 'Content-Type':'text/plain; charset=utf-8' });
     res.end('Not found');
   }
-}).listen(port, '0.0.0.0', () => console.log(`RELIC HUNTER V0.2.4: http://localhost:${port}`));
+}).listen(port, '0.0.0.0', () => console.log(`RELIC HUNTER V0.4.2: http://localhost:${port}`));
