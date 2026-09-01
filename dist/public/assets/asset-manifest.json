@@ -1,6 +1,6 @@
 {
-  "version": "0.4.2",
-  "pipeline": "KAI Official Sprite Integration",
+  "version": "0.6.1",
+  "pipeline": "World 1 Puzzle Flow Fix & Difficulty Tuning",
   "fallbackMode": "runtime_generated_textures",
   "characters": {
     "kai": {
@@ -60,7 +60,14 @@
     "slash": "public/assets/vfx/slash",
     "dash": "public/assets/vfx/dash",
     "hit": "public/assets/vfx/hit",
-    "relic": "public/assets/vfx/relic"
+    "relic": "public/assets/vfx/relic",
+    "slashCrescent": "public/assets/vfx/slash/slash-crescent.png",
+    "dashTrail": "public/assets/vfx/dash/dash-trail.png",
+    "hitSpark": "public/assets/vfx/hit/hit-spark.png",
+    "rootVine": "public/assets/vfx/root/root-vine.png",
+    "bossWarningZone": "public/assets/vfx/boss/boss-warning-zone.png",
+    "groundSlamCrack": "public/assets/vfx/boss/ground-slam-crack.png",
+    "relicAcquireRing": "public/assets/vfx/relic/relic-acquire-ring.png"
   },
   "ui": {
     "icons": "public/assets/ui/icons",
@@ -69,9 +76,55 @@
   },
   "maps": {
     "whisperingForest": {
-      "background": "public/assets/maps/whispering-forest/background",
-      "props": "public/assets/maps/whispering-forest/props",
-      "platforms": "public/assets/maps/whispering-forest/platforms"
+      "background": {
+        "sky": "public/assets/maps/whispering-forest/background/layer-sky.png",
+        "farTrees": "public/assets/maps/whispering-forest/background/layer-far-trees.png",
+        "midTrees": "public/assets/maps/whispering-forest/background/layer-mid-trees.png",
+        "ruins": "public/assets/maps/whispering-forest/background/layer-ruins.png",
+        "mist": "public/assets/maps/whispering-forest/background/layer-mist.png",
+        "foreground": "public/assets/maps/whispering-forest/background/layer-foreground.png"
+      },
+      "props": {
+        "relicShard": "public/assets/maps/whispering-forest/props/relic-shard.png"
+      },
+      "puzzles": {
+        "rockBlock": "public/assets/maps/whispering-forest/props/obstacle-rock-block.png",
+        "fallenTree": "public/assets/maps/whispering-forest/props/obstacle-fallen-tree.png",
+        "rootGate": "public/assets/maps/whispering-forest/props/puzzle-root-gate.png",
+        "forestRune": "public/assets/maps/whispering-forest/props/puzzle-forest-rune.png"
+      }
     }
+  },
+  "gameplay": {
+    "system": "Roguelite Run System",
+    "areas": [
+      "Forest Entrance",
+      "Corrupted Path",
+      "Ancient Ruins",
+      "Elite Camp",
+      "Boss Arena"
+    ],
+    "summaryStats": [
+      "time",
+      "kills",
+      "elites",
+      "bossDefeated",
+      "relicsCollected",
+      "coinsEarned",
+      "bestCombo",
+      "damageDealt",
+      "damageTaken"
+    ]
+  },
+  "notes": {
+    "inputFix": "PC skill dock, relic cards, run summary, and mobile buttons use enlarged click/tap hit zones.",
+    "combatFix": "KAI melee attacks now use directional body hit checks with vertical-gap limits.",
+    "balance": "Enemy HP/damage, boss HP/timing, rewards, cooldowns, and relic values tuned for V0.5.1."
+  },
+  "puzzles": {
+    "moonSeal": "public/assets/maps/whispering-forest/props/puzzle-moon-seal.png",
+    "thornSeal": "public/assets/maps/whispering-forest/props/puzzle-thorn-seal.png",
+    "forestSeal": "public/assets/maps/whispering-forest/props/puzzle-forest-seal.png",
+    "rootGateRule": "Root Gate opens only after Moon Seal + Thorn Seal + Forest Rune"
   }
 }

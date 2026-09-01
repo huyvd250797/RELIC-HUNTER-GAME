@@ -1,4 +1,4 @@
-const W = 1280, H = 720, WORLD_W = 4300, FLOOR_TOP = 620;
+const W = 1280, H = 720, WORLD_W = 5200, FLOOR_TOP = 620;
 const C={bg:0x07171b,cyan:0x61e6e1,cyan2:0x1aa8ae,bronze:0xb17b42,cream:0xe5ddc9,dark:0x10161a,red:0xe25757,red2:0x8f2d3b,green:0x6fcf97,gold:0xf4c76b,warning:0xef4c4c};
 
 const RELICS=[
@@ -13,17 +13,27 @@ const RELICS=[
 ];
 const RELIC_BY_ID=Object.fromEntries(RELICS.map(r=>[r.id,r]));
 
+const RUN_AREAS=[
+  {id:0,name:'Forest Entrance',start:0,end:950,rewardCoins:10,rewardHeal:6},
+  {id:1,name:'Mossy Barricade Puzzle',start:950,end:1750,rewardCoins:16,rewardHeal:5},
+  {id:2,name:'Fallen Tree Timing Trial',start:1750,end:2550,rewardCoins:20,rewardHeal:6},
+  {id:3,name:'Ancient Ruins Seal Hunt',start:2550,end:3350,rewardCoins:24,rewardHeal:7},
+  {id:4,name:'Root Gate Logic Trial',start:3350,end:4300,rewardCoins:32,rewardHeal:8},
+  {id:5,name:'Boss Arena',start:4300,end:WORLD_W,rewardCoins:80,rewardHeal:0}
+];
+
+
 class AdventureScene extends Phaser.Scene{
   inputState={jump:false,attack:false,dash:false,skill:false}; joystickX=0; facing=1; canDash=true; dashReadyAt=0; isDashing=false; invincibleUntil=0; canAttack=true; attackReadyAt=0; attackStep=0; comboExpire=0; skillReadyAt=0; playerHP=100; ended=false; isMobileUI=false; controlWidgets=[]; pcSkillSlots=[]; mobileSkillSlots=[]; relics=[]; relicChoiceOpen=false; relicRewardQueue=[]; eliteRelicDropped=false; bossRelicDropped=false; relicHudItems=[]; burnTimers={}; boundUntil={}; bossSlowUntil=0;
-  coins=0; checkpointX=120; chestOpened=false; portalUnlocked=false; bossActive=false; bossHP=900; bossPhase=1; bossBusy=false; bossNextAttack=0;
-  enemies=[]; enemyId=0; miniBoss=null;
+  coins=0; checkpointX=120; chestOpened=false; portalUnlocked=false; bossActive=false; bossMaxHP=840; bossHP=840; bossPhase=1; bossBusy=false; bossNextAttack=0;
+  enemies=[]; enemyId=0; miniBoss=null; forestRuneCollected=false; moonSealCollected=false; thornSealCollected=false; rootGateOpened=false; puzzleObstacles=[]; worldPuzzles=[]; puzzleTokens=[]; puzzleHud=null; puzzleGoalText=null; puzzleDecisionHint=null;
   constructor(){super('adventure')}
   preload() {
     this.load.image('kaiConcept', './public/assets/reference/kai-concept.png');
     this.load.json('assetManifest', './public/assets/asset-manifest.json');
 
     // Official asset slots.
-    // Các file này có thể chưa tồn tại ở V0.4.2; fallback sẽ tự dùng runtime textures.
+    // Các file này có thể chưa tồn tại ở V0.6.1; fallback sẽ tự dùng runtime textures.
     this.officialAssetSlots = {
       kaiIdle: './public/assets/characters/kai/kai-idle.png',
       kaiRun: './public/assets/characters/kai/kai-run.png',
@@ -35,7 +45,42 @@ class AdventureScene extends Phaser.Scene{
       kaiDash: './public/assets/characters/kai/kai-dash.png',
       kaiSkill: './public/assets/characters/kai/kai-skill.png',
       kaiHurt: './public/assets/characters/kai/kai-hurt.png',
-      kaiDeath: './public/assets/characters/kai/kai-death.png'
+      kaiDeath: './public/assets/characters/kai/kai-death.png',
+      slimeIdle: './public/assets/enemies/slime/slime-idle.png',
+      slimeMove: './public/assets/enemies/slime/slime-move.png',
+      slimeHurt: './public/assets/enemies/slime/slime-hurt.png',
+      slimeDeath: './public/assets/enemies/slime/slime-death.png',
+      eliteIdle: './public/assets/enemies/elite/elite-idle.png',
+      eliteAttack: './public/assets/enemies/elite/elite-attack.png',
+      eliteHurt: './public/assets/enemies/elite/elite-hurt.png',
+      eliteDeath: './public/assets/enemies/elite/elite-death.png',
+      forestGuardianIdle: './public/assets/bosses/forest-guardian/forest-guardian-idle.png',
+      forestGuardianCharge: './public/assets/bosses/forest-guardian/forest-guardian-charge.png',
+      forestGuardianSlam: './public/assets/bosses/forest-guardian/forest-guardian-slam.png',
+      forestGuardianRoot: './public/assets/bosses/forest-guardian/forest-guardian-root.png',
+      forestGuardianRage: './public/assets/bosses/forest-guardian/forest-guardian-rage.png',
+      forestGuardianDeath: './public/assets/bosses/forest-guardian/forest-guardian-death.png',
+      forestSky: './public/assets/maps/whispering-forest/background/layer-sky.png',
+      forestFarTrees: './public/assets/maps/whispering-forest/background/layer-far-trees.png',
+      forestMidTrees: './public/assets/maps/whispering-forest/background/layer-mid-trees.png',
+      forestRuins: './public/assets/maps/whispering-forest/background/layer-ruins.png',
+      forestMist: './public/assets/maps/whispering-forest/background/layer-mist.png',
+      forestForeground: './public/assets/maps/whispering-forest/background/layer-foreground.png',
+      envRelicShard: './public/assets/maps/whispering-forest/props/relic-shard.png',
+      envRockBlock: './public/assets/maps/whispering-forest/props/obstacle-rock-block.png',
+      envFallenTree: './public/assets/maps/whispering-forest/props/obstacle-fallen-tree.png',
+      envRootGate: './public/assets/maps/whispering-forest/props/puzzle-root-gate.png',
+      envForestRune: './public/assets/maps/whispering-forest/props/puzzle-forest-rune.png',
+      envMoonSeal: './public/assets/maps/whispering-forest/props/puzzle-moon-seal.png',
+      envThornSeal: './public/assets/maps/whispering-forest/props/puzzle-thorn-seal.png',
+      envForestSeal: './public/assets/maps/whispering-forest/props/puzzle-forest-seal.png',
+      vfxSlashCrescent: './public/assets/vfx/slash/slash-crescent.png',
+      vfxDashTrail: './public/assets/vfx/dash/dash-trail.png',
+      vfxHitSpark: './public/assets/vfx/hit/hit-spark.png',
+      vfxRootVine: './public/assets/vfx/root/root-vine.png',
+      vfxBossWarning: './public/assets/vfx/boss/boss-warning-zone.png',
+      vfxGroundCrack: './public/assets/vfx/boss/ground-slam-crack.png',
+      vfxRelicAcquireRing: './public/assets/vfx/relic/relic-acquire-ring.png'
     };
 
     Object.entries(this.officialAssetSlots).forEach(([key, path]) => {
@@ -49,9 +94,12 @@ class AdventureScene extends Phaser.Scene{
   }
   create(){
     this.input.addPointer(4); this.cameras.main.setBackgroundColor(C.bg); this.physics.world.setBounds(0,0,WORLD_W,H);
-    this.createTextures(); this.setupOfficialKaiSprites(); this.createWorld(); this.createAmbientPolish(); this.createPlayer(); this.createEnemies(); this.createBoss(); this.createUI(); this.setupInput();
+    this.createTextures(); this.setupOfficialKaiSprites(); this.setupOfficialEnemyBossSprites(); this.initRunSystem(); this.createWorld(); this.createAmbientPolish(); this.createPlayer(); this.createEnemies(); this.createBoss(); this.createUI(); this.setupInput();
     this.cameras.main.startFollow(this.player,true,0.08,0.08); this.cameras.main.setBounds(0,0,WORLD_W,H); this.cameras.main.setDeadzone(240,110);
     this.physics.add.collider(this.player,this.ground);
+    if(this.obstacles)this.physics.add.collider(this.player,this.obstacles);
+    if(this.forestRune)this.physics.add.overlap(this.player,this.forestRune,()=>this.collectForestRune(),null,this);
+    if(this.puzzleTokens&&this.puzzleTokens.length){for(const token of this.puzzleTokens){this.physics.add.overlap(this.player,token.sprite,()=>this.collectPuzzleToken(token),null,this);}}
     for(const e of this.enemies){this.physics.add.collider(e.sprite,this.ground); this.physics.add.overlap(this.player,e.sprite,()=>this.contactDamage(e.sprite,e.damage));}
     this.physics.add.collider(this.boss,this.ground); this.physics.add.overlap(this.player,this.boss,()=>this.contactDamage(this.boss,this.bossPhase===1?11:16));
     this.time.delayedCall(650,()=>this.flash('WORLD 1 • WHISPERING FOREST',1300));
@@ -142,7 +190,7 @@ class AdventureScene extends Phaser.Scene{
     makeKai('kai_skill',{sword:'skill',lean:3,scf:1.55});
     g.fillStyle(C.dark).fillRoundedRect(4,12,44,64,12); g.fillStyle(C.cream).fillCircle(26,18,12); g.fillStyle(0x1d2428).fillCircle(26,14,13); g.fillStyle(C.cyan2).fillTriangle(12,32,42,32,8,58); g.fillStyle(C.bronze).fillRoundedRect(4,31,10,30,4); g.fillStyle(C.cyan).fillRect(39,28,5,42); g.generateTexture('kai',52,80); g.clear();
 
-    // Official-style small HUD portrait for V0.4.2.
+    // Official-style small HUD portrait for V0.6.1.
     g.fillStyle(0x061015,1).fillRoundedRect(0,0,74,74,16);
     g.lineStyle(3,C.cyan,0.75).strokeRoundedRect(3,3,68,68,14);
     g.fillStyle(0x0e3035,1).fillCircle(37,37,29);
@@ -228,6 +276,48 @@ class AdventureScene extends Phaser.Scene{
     this.kaiOfficialActive = this.textures.exists('kaiIdle') || this.textures.exists('kaiRun') || this.textures.exists('kaiAttack1');
   }
 
+  setupOfficialEnemyBossSprites(){
+    const pick=(slot,fallback)=>this.textures.exists(slot)?slot:fallback;
+    this.enemyTex={
+      slime:{
+        idle:pick('slimeIdle','slime'),
+        move:pick('slimeMove','slime'),
+        hurt:pick('slimeHurt','slime'),
+        death:pick('slimeDeath','slime')
+      },
+      elite:{
+        idle:pick('eliteIdle','elite'),
+        move:pick('eliteIdle','elite'),
+        attack:pick('eliteAttack','elite'),
+        hurt:pick('eliteHurt','elite'),
+        death:pick('eliteDeath','elite')
+      }
+    };
+    this.bossTex={
+      idle:pick('forestGuardianIdle','boss'),
+      charge:pick('forestGuardianCharge','boss'),
+      slam:pick('forestGuardianSlam','boss'),
+      root:pick('forestGuardianRoot','boss'),
+      rage:pick('forestGuardianRage','boss'),
+      death:pick('forestGuardianDeath','boss')
+    };
+    this.enemyBossOfficialActive = this.textures.exists('slimeIdle') || this.textures.exists('eliteIdle') || this.textures.exists('forestGuardianIdle');
+  }
+
+  setEnemyTexture(e,state='idle'){
+    if(!e||!e.sprite||!e.sprite.active)return;
+    const group=this.enemyTex?.[e.type]||this.enemyTex?.slime;
+    const key=group?.[state]||group?.idle||e.sprite.texture.key;
+    if(key&&e.sprite.texture.key!==key)e.sprite.setTexture(key);
+  }
+
+  setBossTexture(state='idle'){
+    if(!this.boss||!this.boss.active)return;
+    const key=this.bossTex?.[state]||this.bossTex?.idle||this.boss.texture.key;
+    if(key&&this.boss.texture.key!==key)this.boss.setTexture(key);
+  }
+
+
   setKaiTexture(key){
     if(!this.player) return;
     if(key && key!==this.lastTexture){
@@ -236,7 +326,245 @@ class AdventureScene extends Phaser.Scene{
     }
   }
 
+
+  createOfficialEnvironmentBackdrop(){
+    this.envDrifters=[];
+    const addStrip=(key,depth,scroll,alpha,y=0)=>{
+      if(!this.textures.exists(key))return;
+      for(let x=0;x<WORLD_W+W;x+=W){
+        const img=this.add.image(x,y,key).setOrigin(0,0).setDepth(depth).setScrollFactor(scroll).setAlpha(alpha);
+        img.setDisplaySize(W,H);
+      }
+    };
+    addStrip('forestSky',-42,0.08,1,0);
+    addStrip('forestFarTrees',-36,0.18,0.9,0);
+    addStrip('forestMidTrees',-30,0.33,0.9,0);
+    addStrip('forestRuins',-24,0.5,0.82,0);
+    addStrip('forestMist',-16,0.64,0.52,0);
+    addStrip('forestForeground',28,1.08,0.34,0);
+
+    for(let i=0;i<8;i++){
+      if(this.textures.exists('forestMist')){
+        const fog=this.add.image(Phaser.Math.Between(0,WORLD_W),Phaser.Math.Between(385,635),'forestMist')
+          .setDepth(22).setScrollFactor(0.9).setAlpha(Phaser.Math.FloatBetween(0.12,0.24));
+        fog.setDisplaySize(780+Phaser.Math.Between(0,260),170+Phaser.Math.Between(0,80));
+        fog.baseX=fog.x; fog.driftSpeed=Phaser.Math.FloatBetween(0.15,0.42); fog.phase=Phaser.Math.FloatBetween(0,6.28);
+        this.envDrifters.push(fog);
+      }
+    }
+
+    for(let i=0;i<18;i++){
+      const x=Phaser.Math.Between(180,WORLD_W-180);
+      if(this.textures.exists('envRelicShard')){
+        const shard=this.add.image(x,FLOOR_TOP-Phaser.Math.Between(34,120),'envRelicShard')
+          .setDepth(2).setScale(Phaser.Math.FloatBetween(0.32,0.62)).setAlpha(Phaser.Math.FloatBetween(0.24,0.55));
+        this.tweens.add({targets:shard,y:shard.y-Phaser.Math.Between(5,14),alpha:shard.alpha+0.18,duration:1100+Phaser.Math.Between(0,950),yoyo:true,repeat:-1});
+      }
+    }
+  }
+
+  updateEnvironmentPolish(time){
+    if(!this.envDrifters)return;
+    for(const fog of this.envDrifters){
+      fog.x = fog.baseX + Math.sin(time*0.00045 + fog.phase)*32 + time*0.00006*fog.driftSpeed*W;
+      if(fog.x>WORLD_W+420){fog.x=-420;fog.baseX=-420;}
+    }
+  }
+
+  createGroundCrack(x,y){
+    if(this.textures.exists('vfxGroundCrack')){
+      const crack=this.add.image(x,y,'vfxGroundCrack').setDepth(18).setAlpha(0.9).setScale(0.65+this.bossPhase*0.15);
+      this.tweens.add({targets:crack,alpha:0,scaleX:1.25,scaleY:0.85,duration:700,onComplete:()=>crack.destroy()});
+      return crack;
+    }
+    const g=this.add.graphics({x,y}).setDepth(18);
+    g.lineStyle(5,C.red,0.8);g.beginPath();g.moveTo(-130,0);g.lineTo(-45,-12);g.lineTo(0,8);g.lineTo(55,-6);g.lineTo(135,4);g.strokePath();
+    this.tweens.add({targets:g,alpha:0,duration:620,onComplete:()=>g.destroy()});
+    return g;
+  }
+
+  createBossWarning(x,y,w,h,type='line'){
+    let obj;
+    if(this.textures.exists('vfxBossWarning')){
+      obj=this.add.image(x,y,'vfxBossWarning').setDepth(17).setAlpha(0.55);
+      obj.setDisplaySize(w,h);
+    }else{
+      obj=this.add.rectangle(x,y,w,h,C.warning,.25).setDepth(17);
+    }
+    this.tweens.add({targets:obj,alpha:0.9,yoyo:true,repeat:2,duration:120});
+    return obj;
+  }
+
+
+  initRunSystem(){
+    this.runAreas=RUN_AREAS.map(a=>({...a,cleared:false,entered:false}));
+    this.runStats={
+      runId:Date.now().toString(36).toUpperCase().slice(-6),
+      startedAt:0,
+      timeMs:0,
+      kills:0,
+      elites:0,
+      bossDefeated:false,
+      relicsCollected:0,
+      coinsEarned:0,
+      damageDealt:0,
+      damageTaken:0,
+      bestCombo:0,
+      currentArea:0,
+      completed:false,
+      victory:false
+    };
+    this.pendingWaveReward=false;
+  }
+
+  startRunClock(){
+    if(this.runStats && !this.runStats.startedAt)this.runStats.startedAt=this.time.now;
+    this.markAreaEntered(0);
+  }
+
+  getAreaIndexByX(x){
+    const idx=this.runAreas?this.runAreas.findIndex(a=>x>=a.start&&x<a.end):-1;
+    return idx>=0?idx:0;
+  }
+
+  markAreaEntered(idx){
+    if(!this.runAreas||!this.runAreas[idx]||this.runAreas[idx].entered)return;
+    this.runAreas[idx].entered=true;
+    if(this.areaText)this.areaText.setText(`AREA ${idx+1}/${this.runAreas.length} • ${this.runAreas[idx].name}`);
+    if(idx>0)this.flash(`AREA ${idx+1} • ${this.runAreas[idx].name}`,850);
+  }
+
+  updateRunSystem(time){
+    if(!this.runStats||this.runStats.completed)return;
+    if(!this.runStats.startedAt)this.startRunClock();
+    this.runStats.timeMs=time-this.runStats.startedAt;
+    const idx=this.getAreaIndexByX(this.player.x);
+    if(idx!==this.runStats.currentArea){
+      this.runStats.currentArea=idx;
+      this.markAreaEntered(idx);
+    }
+    if(this.runText){
+      this.runText.setText(`RUN ${this.runStats.runId} • ${this.formatTime(this.runStats.timeMs)}`);
+    }
+    if(this.areaText){
+      const area=this.runAreas[this.runStats.currentArea];
+      this.areaText.setText(`AREA ${this.runStats.currentArea+1}/${this.runAreas.length} • ${area.name}`);
+    }
+  }
+
+  formatTime(ms){
+    const total=Math.max(0,Math.floor(ms/1000));
+    const m=Math.floor(total/60).toString().padStart(2,'0');
+    const s=(total%60).toString().padStart(2,'0');
+    return `${m}:${s}`;
+  }
+
+  addCoins(amount){
+    this.coins+=amount;
+    if(this.runStats)this.runStats.coinsEarned+=amount;
+  }
+
+  recordKill(type){
+    if(!this.runStats)return;
+    this.runStats.kills++;
+    if(type==='elite')this.runStats.elites++;
+  }
+
+
+  tryGrantAreaReward(areaId){
+    if(areaId===undefined||areaId===null||!this.runAreas||!this.runAreas[areaId])return;
+    const area=this.runAreas[areaId];
+    if(area.cleared||areaId>=this.runAreas.length-1)return;
+    const remaining=this.enemies.some(e=>e.areaId===areaId&&e.active);
+    if(remaining)return;
+    if(area.id===4&&!this.rootGateOpened){
+      if(this.time.now>(this.nextPuzzleRewardReminder||0)){
+        this.nextPuzzleRewardReminder=this.time.now+1800;
+        this.flash('AREA NOT CLEAR YET\nSolve the Root Gate puzzle to claim this reward',1200);
+      }
+      return;
+    }
+    area.cleared=true;
+    this.addCoins(area.rewardCoins);
+    if(area.rewardHeal>0)this.healPlayer(area.rewardHeal);
+    this.showAreaReward(area);
+    if(area.id===4&&!this.relicChoiceOpen&&!this.ended)this.time.delayedCall(500,()=>this.showRelicChoices('area'));
+  }
+
+  showAreaReward(area){
+    const t=this.add.text(W/2,185,`AREA CLEAR • ${area.name}\n+${area.rewardCoins} coin${area.rewardHeal?` • +${area.rewardHeal} HP`:''}`,{
+      fontSize:'22px',
+      fontStyle:'bold',
+      color:'#ffe6ad',
+      align:'center',
+      stroke:'#061015',
+      strokeThickness:6
+    }).setOrigin(.5).setScrollFactor(0).setDepth(240);
+    this.tweens.add({targets:t,y:150,alpha:0,duration:1200,onComplete:()=>t.destroy()});
+  }
+
+  finishRun(victory=false){
+    if(this.runStats?.completed)return;
+    this.ended=true;
+    if(this.runStats){
+      this.runStats.completed=true;
+      this.runStats.victory=!!victory;
+      this.runStats.timeMs=this.time.now-(this.runStats.startedAt||this.time.now);
+      if(victory)this.runStats.bossDefeated=true;
+    }
+    this.physics.world.pause();
+    this.showRunSummary(victory);
+  }
+
+  showRunSummary(victory=false){
+    if(this.summaryLayer)this.summaryLayer.destroy();
+    const st=this.runStats||{};
+    const layer=this.add.container(0,0).setScrollFactor(0).setDepth(430);
+    this.summaryLayer=layer;
+    layer.add(this.add.rectangle(W/2,H/2,W,H,0x02080a,0.84));
+    layer.add(this.add.rectangle(W/2,H/2,650,500,0x07171b,0.96).setStrokeStyle(3,victory?C.cyan:C.red,0.85));
+    layer.add(this.add.text(W/2,130,victory?'RUN COMPLETE':'RUN FAILED',{
+      fontSize:'34px',
+      fontStyle:'bold',
+      color:victory?'#c8fffb':'#ffd1d1',
+      stroke:'#061015',
+      strokeThickness:7
+    }).setOrigin(.5));
+    layer.add(this.add.text(W/2,171,victory?'Boss defeated • Portal escaped':'KAI fallen • Start a new run',{
+      fontSize:'15px',
+      color:'#ffe6ad'
+    }).setOrigin(.5));
+
+    const rows=[
+      ['Time',this.formatTime(st.timeMs||0)],
+      ['Enemies defeated',st.kills||0],
+      ['Elite defeated',st.elites||0],
+      ['Boss defeated',st.bossDefeated?'YES':'NO'],
+      ['Relics collected',st.relicsCollected||this.relics.length],
+      ['Coins earned',st.coinsEarned||0],
+      ['Best combo',st.bestCombo||0],
+      ['Damage dealt',st.damageDealt||0],
+      ['Damage taken',st.damageTaken||0],
+      ['Puzzle solved',this.rootGateOpened?`Root Gate • ${this.getPuzzleSealCount()}/3 seals`:`${this.getPuzzleSealCount()}/3 seals`]
+    ];
+    rows.forEach((row,i)=>{
+      const y=214+i*28;
+      layer.add(this.add.text(W/2-230,y,row[0],{fontSize:'16px',color:'#b7d4d2'}).setOrigin(0,.5));
+      layer.add(this.add.text(W/2+210,y,String(row[1]),{fontSize:'16px',fontStyle:'bold',color:'#ffffff'}).setOrigin(1,.5));
+    });
+
+    const btnBg=this.add.rectangle(W/2,610,210,52,0xf4c76b,1).setStrokeStyle(3,0xffffff,0.25);
+    const btnText=this.add.text(W/2,610,'NEW RUN / RETRY',{fontSize:'16px',fontStyle:'bold',color:'#07171b'}).setOrigin(.5);
+    const btnHit=this.add.zone(W/2,610,250,82);
+    [btnBg,btnText,btnHit].forEach(o=>this.makeUiButtonHit(o,(pointer)=>this.scene.restart()));
+    btnHit.setDepth(999);
+    layer.add([btnBg,btnText,btnHit]);
+    layer.add(this.add.text(W/2,656,'PC: nhấn R • Mobile: tap nút NEW RUN / RETRY',{fontSize:'13px',color:'#89a5a4'}).setOrigin(.5));
+    if(this.status)this.status.setVisible(false);
+  }
+
   createWorld(){
+    this.createOfficialEnvironmentBackdrop();
     // Layered dark-fantasy forest: silhouettes, ruins, mist, and teal relic glows.
     for(let i=0;i<36;i++){
       const x=i*140+20,h=110+(i%7)*30;
@@ -263,21 +591,22 @@ class AdventureScene extends Phaser.Scene{
       this.physics.add.existing(p,true);this.ground.add(p);
       this.add.rectangle(x,y-15,w-22,4,C.cyan,0.13);
     });
-    for(let i=0;i<46;i++){
+    this.createWorld1Puzzles();
+    for(let i=0;i<54;i++){
       const x=Phaser.Math.Between(80,WORLD_W-80), y=Phaser.Math.Between(505,650);
       this.add.triangle(x,y,x-8,y+18,x+10,y+18,i%2?0x214d40:0x193a34,0.8);
       if(i%5===0) this.add.circle(x+8,y+8,3,C.cyan,0.22);
     }
     this.add.text(70,105,'WHISPERING FOREST',{fontSize:'22px',fontStyle:'bold',color:'#8ff8f0'});
-    this.add.text(70,133,'KAI Official Sprite Integration • Visual Foundation',{fontSize:'13px',color:'#8aa9a7'});
+    this.add.text(70,133,'World 1 Puzzle Flow Fix & Difficulty Tuning • Puzzle Obstacles',{fontSize:'13px',color:'#8aa9a7'});
     this.checkpoint=this.add.container(1760,590);this.checkpoint.add(this.add.rectangle(0,0,18,95,C.cyan2,0.7));this.checkpoint.add(this.add.circle(0,-52,18,C.cyan,0.8));this.checkpoint.add(this.add.text(0,36,'CHECKPOINT',{fontSize:'12px',color:'#9ff'}).setOrigin(0.5));
     this.tweens.add({targets:this.checkpoint.list[1],scale:1.2,alpha:0.55,yoyo:true,repeat:-1,duration:850});
     this.chest=this.physics.add.staticSprite(2600,FLOOR_TOP-36,'chest');
-    this.portal=this.add.container(4100,FLOOR_TOP-86).setVisible(false); const ring=this.add.circle(0,0,62,C.cyan,0.13).setStrokeStyle(7,C.cyan,0.8); const core=this.add.circle(0,0,32,C.cyan2,0.45); this.portal.add([ring,core,this.add.text(0,88,'EXIT PORTAL',{fontSize:'14px',color:'#bff'}).setOrigin(0.5)]); this.tweens.add({targets:core,scale:1.2,alpha:0.75,yoyo:true,repeat:-1,duration:700});
+    this.portal=this.add.container(5050,FLOOR_TOP-86).setVisible(false); const ring=this.add.circle(0,0,62,C.cyan,0.13).setStrokeStyle(7,C.cyan,0.8); const core=this.add.circle(0,0,32,C.cyan2,0.45); this.portal.add([ring,core,this.add.text(0,88,'EXIT PORTAL',{fontSize:'14px',color:'#bff'}).setOrigin(0.5)]); this.tweens.add({targets:core,scale:1.2,alpha:0.75,yoyo:true,repeat:-1,duration:700});
     this.physics.add.overlap(this.player??this.add.zone(-999,-999,1,1),this.chest,()=>{});
   }
   createAmbientPolish(){
-    // V0.4.2 KAI Official Sprite Integration: lightweight runtime atmosphere.
+    // V0.6.1 KAI Official Sprite Integration: lightweight runtime atmosphere.
     this.add.rectangle(WORLD_W/2, 0, WORLD_W, H, 0x031013, 0.16).setOrigin(0.5,0).setScrollFactor(0.12).setDepth(-8);
     for(let i=0;i<34;i++){
       const x=Phaser.Math.Between(120,WORLD_W-120);
@@ -296,11 +625,232 @@ class AdventureScene extends Phaser.Scene{
       this.tweens.add({targets:relic,alpha:0.36,scale:1.25,duration:900+Phaser.Math.Between(0,800),yoyo:true,repeat:-1});
     }
   }
+
+
+  createWorld1Puzzles(){
+    this.obstacles=this.physics.add.staticGroup();
+    this.puzzleObstacles=[];
+    this.puzzleTokens=[];
+    this.moonSealCollected=false;
+    this.thornSealCollected=false;
+    this.forestRuneCollected=false;
+    this.rootGateOpened=false;
+
+    // Puzzle 1: Mossy Rock Block.
+    // Người chơi không thể chỉ chạy thẳng. Muốn lấy Moon Seal phải quan sát bệ thấp/bệ cao.
+    this.createObstacleSprite(1515,FLOOR_TOP-55,'envRockBlock',92,118,72,110,'MOSSY ROCK BLOCK');
+    this.createPuzzleLedge(1360,532,128,'low step');
+    this.createPuzzleLedge(1532,490,108,'middle');
+    this.createPuzzleLedge(1688,456,116,'seal ledge');
+    this.createPuzzleToken('moon',1688,412,'MOON SEAL',this.textures.exists('envMoonSeal')?'envMoonSeal':'envForestRune',0x66e8ff);
+    this.addPuzzleHint(1496,FLOOR_TOP-156,'PUZZLE 1 • Đá chắn đường\nKhông chạy thẳng được\nQuan sát bệ thấp → bệ cao → lấy Moon Seal');
+
+    // Puzzle 2: Fallen Tree.
+    // Buộc người chơi thử timing Jump + Dash để lấy Thorn Seal, nếu bỏ qua sẽ kẹt ở Root Gate.
+    this.createObstacleSprite(2320,FLOOR_TOP-27,'envFallenTree',270,62,250,48,'FALLEN TREE');
+    this.createPuzzleLedge(2172,532,112,'start');
+    this.createPuzzleLedge(2328,492,96,'dash gap');
+    this.createPuzzleLedge(2502,462,116,'thorn');
+    this.createPuzzleToken('thorn',2502,416,'THORN SEAL',this.textures.exists('envThornSeal')?'envThornSeal':'envForestRune',0x71d879);
+    this.addPuzzleHint(2320,FLOOR_TOP-136,'PUZZLE 2 • Cây đổ chắn đường\nNhảy qua nhánh thấp\nDash đúng nhịp để lấy Thorn Seal');
+
+    // Puzzle 3: Ancient Root Gate.
+    // Forest Rune chỉ mở cổng nếu người chơi đã thu đủ 2 seal trước đó.
+    this.createPuzzleLedge(3120,540,130,'ruins 1');
+    this.createPuzzleLedge(3286,500,110,'ruins 2');
+    this.createPuzzleLedge(3432,458,120,'rune altar');
+    this.forestRune=this.physics.add.staticImage(3432,410,this.textures.exists('envForestSeal')?'envForestSeal':(this.textures.exists('envForestRune')?'envForestRune':'envRelicShard')).setDepth(18).setDisplaySize(64,64).refreshBody();
+    this.tweens.add({targets:this.forestRune,y:400,alpha:0.72,duration:760,yoyo:true,repeat:-1});
+    this.rootGateVisual=this.add.image(3670,FLOOR_TOP-92,this.textures.exists('envRootGate')?'envRootGate':'envRelicShard').setDepth(16).setDisplaySize(118,172);
+    this.rootGateBody=this.add.rectangle(3670,FLOOR_TOP-72,78,150,0x000000,0.001).setDepth(16);
+    this.physics.add.existing(this.rootGateBody,true);this.obstacles.add(this.rootGateBody);
+    this.addPuzzleHint(3432,365,'PUZZLE 3 • FOREST RUNE\nCổng chỉ mở khi có đủ\nMoon Seal + Thorn Seal + Forest Rune');
+    this.gateHint=this.add.text(3670,FLOOR_TOP-206,'ROOT GATE LOCKED\nCần 3 dấu ấn: Moon + Thorn + Forest', {fontSize:'13px',fontStyle:'bold',color:'#c8fffb',align:'center',stroke:'#061015',strokeThickness:4,wordWrap:{width:260}}).setOrigin(.5).setDepth(35);
+
+    // Một "false low route" nhỏ để người chơi hiểu phải suy nghĩ bằng đường cao.
+    this.addPuzzleHint(2870,FLOOR_TOP-120,'Gợi ý: Không phải lối nào chạy thẳng cũng đúng\nHãy nhìn dấu sáng trên bệ cao');
+  }
+
+  createObstacleSprite(x,y,key,displayW,displayH,bodyW,bodyH,label){
+    const tex=this.textures.exists(key)?key:'envRelicShard';
+    const visual=this.add.image(x,y,tex).setDepth(14).setDisplaySize(displayW,displayH);
+    const body=this.add.rectangle(x,y,bodyW,bodyH,0x000000,0.001).setDepth(13);
+    this.physics.add.existing(body,true);
+    this.obstacles.add(body);
+    body.puzzleLabel=label;
+    this.puzzleObstacles.push({visual,body,label});
+    return body;
+  }
+
+  createPuzzleLedge(x,y,w,label=''){
+    const p=this.add.rectangle(x,y,w,20,0x294841,0.94).setDepth(9);
+    this.physics.add.existing(p,true);this.ground.add(p);
+    this.add.rectangle(x,y-14,w-20,4,C.cyan,0.18).setDepth(10);
+    if(label)this.add.text(x,y-35,label,{fontSize:'10px',fontStyle:'bold',color:'#9ff',stroke:'#061015',strokeThickness:3}).setOrigin(.5).setDepth(20).setAlpha(.75);
+    return p;
+  }
+
+  addPuzzleHint(x,y,text){
+    const t=this.add.text(x,y,text,{fontSize:'13px',fontStyle:'bold',color:'#eaffff',align:'center',stroke:'#061015',strokeThickness:4,wordWrap:{width:220}}).setOrigin(.5).setDepth(31).setAlpha(.82);
+    this.worldPuzzles.push(t);
+    this.tweens.add({targets:t,y:y-8,alpha:.58,duration:1100,yoyo:true,repeat:-1});
+    return t;
+  }
+
+
+  createPuzzleToken(id,x,y,label,key,color){
+    const sprite=this.physics.add.staticImage(x,y,key).setDepth(22).setDisplaySize(58,58).refreshBody();
+    sprite.setTint(color);
+    const aura=this.add.circle(x,y,32,color,0.13).setDepth(20);
+    const text=this.add.text(x,y-48,label,{fontSize:'11px',fontStyle:'bold',color:'#eaffff',align:'center',stroke:'#061015',strokeThickness:4}).setOrigin(.5).setDepth(32).setAlpha(.86);
+    this.tweens.add({targets:[sprite,aura],y:y-8,alpha:0.82,duration:820,yoyo:true,repeat:-1});
+    const token={id,label,sprite,aura,text,color,collected:false};
+    this.puzzleTokens.push(token);
+    return token;
+  }
+
+  collectPuzzleToken(token){
+    if(!token||token.collected)return;
+    token.collected=true;
+    if(token.id==='moon')this.moonSealCollected=true;
+    if(token.id==='thorn')this.thornSealCollected=true;
+    if(token.sprite){this.tweens.add({targets:token.sprite,scale:1.55,alpha:0,y:token.sprite.y-44,duration:420,onComplete:()=>token.sprite.destroy()});}
+    if(token.aura){this.tweens.add({targets:token.aura,scale:1.9,alpha:0,duration:420,onComplete:()=>token.aura.destroy()});}
+    if(token.text){token.text.setText(token.label); this.tweens.add({targets:token.text,alpha:0,y:token.text.y-22,duration:520,onComplete:()=>token.text.destroy()});}
+    this.addCoins(12);
+    this.flash(`${token.label} ACQUIRED • Puzzle seal ${this.getPuzzleSealCount()}/3`,1050);
+    this.updatePuzzleHud();
+    this.tryOpenRootGate();
+  }
+
+  getPuzzleSealCount(){
+    return (this.moonSealCollected?1:0)+(this.thornSealCollected?1:0)+(this.forestRuneCollected?1:0);
+  }
+
+  tryOpenRootGate(){
+    this.updatePuzzleHud();
+    if(this.rootGateOpened)return;
+    if(this.moonSealCollected&&this.thornSealCollected&&this.forestRuneCollected){
+      this.openRootGate();
+      return;
+    }
+    if(this.forestRuneCollected){
+      const missing=[];
+      if(!this.moonSealCollected)missing.push('Moon Seal ở khu đá chắn');
+      if(!this.thornSealCollected)missing.push('Thorn Seal ở khu cây đổ');
+      this.flash(`ROOT GATE STILL LOCKED\nThiếu: ${missing.join(' + ')}`,1500);
+      if(this.gateHint)this.gateHint.setText(`ROOT GATE LOCKED\nThiếu: ${missing.join(' + ')}`);
+    }
+  }
+
+  updatePuzzleHud(){
+    const c=this.getPuzzleSealCount?this.getPuzzleSealCount():0;
+    const parts=[
+      this.moonSealCollected?'✓ Moon':'□ Moon',
+      this.thornSealCollected?'✓ Thorn':'□ Thorn',
+      this.forestRuneCollected?'✓ Forest':'□ Forest'
+    ];
+    if(this.puzzleHud)this.puzzleHud.setText(`PUZZLE SEALS ${c}/3 • ${parts.join('  ')}`);
+    if(this.puzzleGoalText){
+      const goal=this.rootGateOpened?'Root Gate opened • Boss path unlocked':'Find 3 seals to unlock Root Gate';
+      this.puzzleGoalText.setText(goal);
+    }
+  }
+
+
+
+  collectForestRune(){
+    if(this.forestRuneCollected)return;
+    this.forestRuneCollected=true;
+    if(this.forestRune){this.tweens.add({targets:this.forestRune,scale:1.45,alpha:0,y:this.forestRune.y-42,duration:420,onComplete:()=>this.forestRune.destroy()});}
+    this.addCoins(16);
+    this.healPlayer(6);
+    this.flash(`FOREST RUNE ACQUIRED • Puzzle seal ${this.getPuzzleSealCount()}/3`,1100);
+    this.tryOpenRootGate();
+  }
+
+
+  openRootGate(){
+    if(this.rootGateOpened)return;
+    this.rootGateOpened=true;
+    if(this.rootGateBody){this.rootGateBody.body.enable=false;this.rootGateBody.destroy();this.rootGateBody=null;}
+    if(this.gateHint)this.gateHint.setText('ROOT GATE OPENED\nBoss path unlocked').setColor('#9dffb0');
+    if(this.rootGateVisual){this.tweens.add({targets:this.rootGateVisual,alpha:0.12,y:this.rootGateVisual.y-32,scaleX:0.82,scaleY:0.82,duration:520});}
+    this.createRootFx(3670,FLOOR_TOP-25);
+    this.addCoins(18);
+    this.healPlayer(8);
+    if(this.objective)this.objective.setText('OBJECTIVE: Root Gate solved • Reach the Boss Arena');
+    this.flash('PUZZLE SOLVED • ROOT GATE OPENED',1300);
+    this.updatePuzzleHud();
+  }
+
   createPlayer(){this.player=this.physics.add.sprite(120,FLOOR_TOP-38,this.kaiTex.idle).setCollideWorldBounds(true).setDragX(1600).setMaxVelocity(520,900);this.player.body.setSize(38,68).setOffset(29,18);this.animLockUntil=0;this.hurtUntil=0;this.lastTexture=this.kaiTex.idle}
-  spawnEnemy(x,type='slime'){const elite=type==='elite';const y=elite?FLOOR_TOP-40:FLOOR_TOP-21;const s=this.physics.add.sprite(x,y,elite?'elite':'slime').setCollideWorldBounds(true).setDragX(900).setBounce(0.02);s.body.setSize(elite?70:54,elite?70:34).setOffset(elite?13:7,elite?18:14);const e={id:++this.enemyId,sprite:s,type,hp:elite?170:65,maxHp:elite?170:65,damage:elite?12:7,speed:elite?85:65,active:true,floorY:y};this.enemies.push(e);return e}
-  createEnemies(){[650,1040,1280,2050,2300,3150].forEach(x=>this.spawnEnemy(x));this.miniBoss=this.spawnEnemy(2850,'elite')}
-  createBoss(){this.boss=this.physics.add.sprite(3820,FLOOR_TOP-62,'boss').setVisible(false).setActive(false).setCollideWorldBounds(true);this.boss.body.setSize(96,104).setOffset(20,18);this.boss.body.enable=false}
-  setupInput(){if(this.input.keyboard)this.keys={left:this.input.keyboard.addKey('A'),right:this.input.keyboard.addKey('D'),left2:this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT),right2:this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT),jump:this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),attack:this.input.keyboard.addKey('J'),dash:this.input.keyboard.addKey('K'),skill:this.input.keyboard.addKey('L'),restart:this.input.keyboard.addKey('R'),choice1:this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE),choice2:this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO),choice3:this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.THREE)};}
+  spawnEnemy(x,type='slime'){const elite=type==='elite';const y=elite?FLOOR_TOP-54:FLOOR_TOP-30;const tex=elite?this.enemyTex.elite.idle:this.enemyTex.slime.idle;const s=this.physics.add.sprite(x,y,tex).setCollideWorldBounds(true).setDragX(900).setBounce(0.02).setDepth(10);s.body.setSize(elite?76:58,elite?78:38).setOffset(elite?26:19,elite?38:23);const hp=elite?155:60;const e={id:++this.enemyId,sprite:s,type,hp,maxHp:hp,damage:elite?11:6,speed:elite?78:62,active:true,floorY:y,state:'idle',areaId:this.getAreaIndexByX(x)};this.enemies.push(e);return e}
+  createEnemies(){[620,1040,1280,1980,2240,2570,3150,3890,4140].forEach(x=>this.spawnEnemy(x));this.miniBoss=this.spawnEnemy(2850,'elite');this.spawnEnemy(4050,'elite')}
+  createBoss(){this.boss=this.physics.add.sprite(4720,FLOOR_TOP-76,this.bossTex.idle).setVisible(false).setActive(false).setCollideWorldBounds(true).setDepth(12);this.boss.body.setSize(96,104).setOffset(20,18);this.boss.body.enable=false}
+  setupInput(){if(this.input.setTopOnly)this.input.setTopOnly(false);else this.input.topOnly=false;if(this.input.keyboard)this.keys={left:this.input.keyboard.addKey('A'),right:this.input.keyboard.addKey('D'),left2:this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT),right2:this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT),jump:this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),attack:this.input.keyboard.addKey('J'),dash:this.input.keyboard.addKey('K'),skill:this.input.keyboard.addKey('L'),restart:this.input.keyboard.addKey('R'),choice1:this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE),choice2:this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO),choice3:this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.THREE)};this.input.on('pointerdown',p=>this.handlePointerButtonFallback(p));}
+
+  stopUiEvent(event){if(event&&event.stopPropagation)event.stopPropagation();}
+
+  pressVirtualAction(field,hold=false){
+    if(this.relicChoiceOpen||this.ended)return;
+    this.inputState[field]=true;
+    if(!hold)this.time.delayedCall(90,()=>{this.inputState[field]=false;});
+  }
+
+  makeUiButtonHit(target,onPick){
+    target.setInteractive({useHandCursor:true});
+    target.on('pointerdown',(pointer,localX,localY,event)=>{this.stopUiEvent(event);onPick(pointer);});
+    target.on('pointerup',(pointer,localX,localY,event)=>this.stopUiEvent(event));
+    target.on('pointerupoutside',(pointer,localX,localY,event)=>this.stopUiEvent(event));
+    return target;
+  }
+
+
+  canMeleeHit(target,reach,verticalGapLimit=18,behindAllowance=28){
+    if(!this.player||!target||!this.player.body||!target.body||!target.body.enable)return false;
+    const pb=this.player.body,tb=target.body;
+    const p={left:pb.x,right:pb.x+pb.width,top:pb.y,bottom:pb.y+pb.height,cx:pb.x+pb.width/2,cy:pb.y+pb.height/2};
+    const t={left:tb.x,right:tb.x+tb.width,top:tb.y,bottom:tb.y+tb.height,cx:tb.x+tb.width/2,cy:tb.y+tb.height/2};
+    const inFront=this.facing>0?t.cx>=p.cx-4:t.cx<=p.cx+4;
+    const frontGap=this.facing>0?t.left-p.right:p.left-t.right;
+    const verticalOverlap=Math.min(p.bottom,t.bottom)-Math.max(p.top,t.top);
+    const centerYGap=Math.abs(p.cy-t.cy);
+    // V0.6.1: stricter combat tier. KAI đứng trên bệ/tường không còn chém xuyên xuống tầng dưới.
+    const footGap=Math.abs(p.bottom-t.bottom);
+    const sameCombatLevel=(verticalOverlap>=16 || centerYGap<=verticalGapLimit) && footGap<=46;
+    if(!inFront||frontGap>reach||frontGap<-behindAllowance||!sameCombatLevel)return false;
+    return !this.isObstacleBetween(p,t);
+  }
+
+  isObstacleBetween(p,t){
+    if(!this.puzzleObstacles||!this.puzzleObstacles.length)return false;
+    const left=Math.min(p.cx,t.cx),right=Math.max(p.cx,t.cx);
+    const y=(p.cy+t.cy)/2;
+    return this.puzzleObstacles.some(o=>{
+      const b=o.body?.body;if(!b||!b.enable)return false;
+      const cx=b.x+b.width/2,top=b.y,bottom=b.y+b.height;
+      return cx>left&&cx<right&&y>top-12&&y<bottom+12;
+    });
+  }
+
+  handlePointerButtonFallback(pointer){
+    if(!pointer)return;
+    // Robust PC/touch fallback in case Phaser zone ordering misses the click.
+    if(this.relicChoiceOpen&&this.relicChoices&&this.relicChoices.length){
+      const sx=W/2-315;
+      for(let i=0;i<this.relicChoices.length;i++){
+        const x=sx+i*315,y=345;
+        if(pointer.x>=x-150&&pointer.x<=x+150&&pointer.y>=y-165&&pointer.y<=y+165){const c=this.relicChoices[i];this.selectRelic(c.id,c.source);return;}
+      }
+    }
+    if(this.ended&&pointer.x>=W/2-140&&pointer.x<=W/2+140&&pointer.y>=560&&pointer.y<=655){this.scene.restart();return;}
+    if(!this.isMobileUI&&!this.relicChoiceOpen&&!this.ended){
+      const map=[{field:'jump',x:W/2-126,y:H-52,r:50},{field:'dash',x:W/2-42,y:H-52,r:52},{field:'skill',x:W/2+44,y:H-52,r:54},{field:'attack',x:W/2+132,y:H-52,r:58}];
+      for(const b of map){if(Math.hypot(pointer.x-b.x,pointer.y-b.y)<=b.r){this.pressVirtualAction(b.field);return;}}
+    }
+  }
+
   createUI(){
     this.isMobileUI = this.detectMobileUI();
     const ui=this.add.container(0,0).setScrollFactor(0).setDepth(100);
@@ -308,7 +858,11 @@ class AdventureScene extends Phaser.Scene{
     ui.add(this.add.image(47,49,'kaiPortrait').setDisplaySize(48,48));
     ui.add(this.add.text(82,27,'KAI',{fontSize:'16px',fontStyle:'bold',color:'#d8fffc'}));
     this.hpBar=this.add.graphics();ui.add(this.hpBar);
-    this.objective=this.add.text(28,94,'OBJECTIVE: Reach the Forest Guardian',{fontSize:'16px',color:'#d8fffc',backgroundColor:'#061015aa',padding:{x:12,y:8}});ui.add(this.objective);
+    this.objective=this.add.text(28,94,'OBJECTIVE: Solve seal puzzles, clear areas and build Relics',{fontSize:'16px',color:'#d8fffc',backgroundColor:'#061015aa',padding:{x:12,y:8}});ui.add(this.objective);
+    ui.add(this.add.rectangle(386,18,455,82,0x061015,0.70).setOrigin(0));
+    this.runText=this.add.text(402,28,'RUN ------ • 00:00',{fontSize:'15px',fontStyle:'bold',color:'#ffe6ad'});ui.add(this.runText);
+    this.areaText=this.add.text(402,53,'AREA 1/6 • Forest Entrance',{fontSize:'13px',color:'#8ff8f0'});ui.add(this.areaText);
+    this.puzzleHud=this.add.text(402,76,'PUZZLE SEALS 0/3 • □ Moon  □ Thorn  □ Forest',{fontSize:'12px',fontStyle:'bold',color:'#bffaf5',stroke:'#061015',strokeThickness:3});ui.add(this.puzzleHud);
     this.relicHud=this.add.container(28,140);
     this.relicHud.add(this.add.rectangle(0,0,390,70,0x061015,0.46).setOrigin(0));
     this.relicHud.add(this.add.text(12,8,'RELIC BUILD',{fontSize:'12px',fontStyle:'bold',color:'#8ff8f0'}));
@@ -352,24 +906,25 @@ class AdventureScene extends Phaser.Scene{
     const knob=this.add.circle(130,H-118,28,0x1b4b52,.46).setStrokeStyle(2,0xffffff,.14);
     const zone=this.add.circle(130,H-118,92,0,0.001).setInteractive();
     this.joy.base=base;this.joy.knob=knob;this.controlWidgets.push(base,halo,knob,zone);
-    const start=p=>{if(!this.isMobileUI||p.x>W*.45)return;this.joy.pointerId=p.id;this.updateJoy(p);base.setScale(1.04);knob.setScale(1.06)};
-    zone.on('pointerdown',start);
-    this.input.on('pointerdown',p=>{if(!this.isMobileUI)return;if(this.joy.pointerId===null&&p.x<W*.45&&p.y>H*.46)start(p)});
+    const start=p=>{if(!this.isMobileUI||this.relicChoiceOpen||this.ended||p.x>W*.45)return;this.joy.pointerId=p.id;this.updateJoy(p);base.setScale(1.04);knob.setScale(1.06)};
+    zone.on('pointerdown',(pointer,localX,localY,event)=>{this.stopUiEvent(event);start(pointer);});
+    this.input.on('pointerdown',p=>{if(!this.isMobileUI||this.relicChoiceOpen||this.ended)return;if(this.joy.pointerId===null&&p.x<W*.45&&p.y>H*.46)start(p)});
     this.input.on('pointermove',p=>{if(this.isMobileUI&&this.joy.pointerId===p.id)this.updateJoy(p)});
     const stop=p=>{if(this.joy.pointerId===p.id){this.resetJoy();base.setScale(1);knob.setScale(1)}};
     this.input.on('pointerup',stop);this.input.on('pointerupoutside',stop);
     ui.add([base,halo,knob,zone]);
     const btn=(x,y,r,key,field,bg,accent,label)=>{
       const shadow=this.add.circle(x+6,y+7,r+2,0x000000,.24);
-      const ring=this.add.circle(x,y,r,bg,.9).setStrokeStyle(3,accent,.55).setInteractive();
+      const ring=this.add.circle(x,y,r,bg,.9).setStrokeStyle(3,accent,.55);
       const inner=this.add.circle(x,y,r-10,accent,.08);
       const icon=this.add.image(x,y,key).setDisplaySize(r*1.08,r*1.08);
       const txt=this.add.text(x,y+r+13,label,{fontSize:'13px',fontStyle:'bold',color:'#eaffff',stroke:'#061015',strokeThickness:4}).setOrigin(.5);
-      ring.on('pointerdown',()=>{if(!this.isMobileUI)return;this.inputState[field]=true;ring.setScale(.95);inner.setScale(.92);icon.setScale(.92)});
-      const rel=()=>{this.inputState[field]=false;ring.setScale(1);inner.setScale(1);icon.setScale(1)};
-      ring.on('pointerup',rel);ring.on('pointerout',rel);
-      this.controlWidgets.push(shadow,ring,inner,icon,txt);
-      ui.add([shadow,ring,inner,icon,txt]);
+      const hit=this.add.zone(x,y,(r+20)*2,(r+20)*2).setOrigin(.5).setInteractive({useHandCursor:true});
+      hit.on('pointerdown',(pointer,localX,localY,event)=>{this.stopUiEvent(event);if(!this.isMobileUI)return;this.inputState[field]=true;ring.setScale(.95);inner.setScale(.92);icon.setScale(.92)});
+      const rel=(pointer,localX,localY,event)=>{this.stopUiEvent(event);this.inputState[field]=false;ring.setScale(1);inner.setScale(1);icon.setScale(1)};
+      hit.on('pointerup',rel);hit.on('pointerupoutside',rel);hit.on('pointerout',rel);
+      this.controlWidgets.push(shadow,ring,inner,icon,txt,hit);
+      ui.add([shadow,ring,inner,icon,txt,hit]);
     };
     btn(W-116,H-112,58,'iconAttack','attack',0x4a2e27,C.bronze,'ATTACK');
     btn(W-250,H-132,42,'iconSkill','skill',0x16363c,C.cyan,'SKILL');
@@ -398,9 +953,15 @@ class AdventureScene extends Phaser.Scene{
       const cdText=this.add.text(cfg.x,y,'',{fontSize:'15px',fontStyle:'bold',color:'#ffffff',stroke:'#061015',strokeThickness:4}).setOrigin(.5).setVisible(false);
       const keyBox=this.add.text(cfg.x,y-cfg.r-13,cfg.hotkey,{fontSize:'10px',fontStyle:'bold',color:'#f8ddb0',backgroundColor:'#061015aa',padding:{x:5,y:2}}).setOrigin(.5).setAlpha(.85);
       const label=this.add.text(cfg.x,y+cfg.r+13,cfg.name,{fontSize:'9px',fontStyle:'bold',color:'#d8fffc'}).setOrigin(.5).setAlpha(.85);
-      const objects=[dockBg,dockTitle,shadow,ring,inner,icon,cd,cdText,keyBox,label];
+      const hit=this.add.zone(cfg.x,y,(cfg.r+28)*2,(cfg.r+28)*2).setOrigin(.5).setDepth(1000);
+      this.makeUiButtonHit(hit,()=>{
+        this.pressVirtualAction(cfg.field);
+        ring.setScale(.93);inner.setScale(.9);icon.setScale(.9);
+        this.time.delayedCall(90,()=>{ring.setScale(1);inner.setScale(1);icon.setScale(1);});
+      });
+      const objects=[dockBg,dockTitle,shadow,ring,inner,icon,cd,cdText,keyBox,label,hit];
       this.pcSkillSlots.push({...cfg,y,cooldownOverlay:cd,cooldownText:cdText,objects});
-      ui.add([shadow,ring,inner,icon,cd,cdText,keyBox,label]);
+      ui.add([shadow,ring,inner,icon,cd,cdText,keyBox,label,hit]);
     }
   }
   updateControlCooldowns(time){
@@ -422,14 +983,14 @@ class AdventureScene extends Phaser.Scene{
   }
   updateJoy(p){const dx=p.x-130,dy=p.y-(H-118),d=Math.hypot(dx,dy)||1,m=Math.min(d,56);this.joy.knob.x=130+dx/d*m;this.joy.knob.y=H-118+dy/d*m;this.joystickX=Phaser.Math.Clamp((dx/d*m)/56,-1,1)} resetJoy(){this.joy.pointerId=null;this.joystickX=0;this.joy.knob.setPosition(130,H-118)}
   consume(field,key){const t=this.inputState[field];if(t)this.inputState[field]=false;return !!t||!!(key&&Phaser.Input.Keyboard.JustDown(key))}
-  update(time){if(this.ended){if(this.keys&&Phaser.Input.Keyboard.JustDown(this.keys.restart))this.scene.restart();return}if(this.relicChoiceOpen){this.handleRelicChoiceKeys();this.updateControlCooldowns(time);this.drawUI();return}this.handlePlayer(time);this.updatePlayerVisual(time);this.updateEnemies();this.keepActorsAboveFloor();this.updateAdventure(time);this.updateBoss(time);this.drawUI();this.updateControlCooldowns(time);const rem=Math.max(0,this.skillReadyAt-time);if(this.skillText)this.skillText.setText(rem<=0?'Skill READY':`Skill ${(rem/1000).toFixed(1)}s`)}
+  update(time){this.updateEnvironmentPolish(time);if(this.ended){if(this.keys&&Phaser.Input.Keyboard.JustDown(this.keys.restart))this.scene.restart();this.updateControlCooldowns(time);this.drawUI();return}if(this.relicChoiceOpen){this.handleRelicChoiceKeys();this.updateControlCooldowns(time);this.drawUI();return}this.updateRunSystem(time);this.handlePlayer(time);this.updatePlayerVisual(time);this.updateEnemies();this.keepActorsAboveFloor();this.updateAdventure(time);this.updateBoss(time);this.drawUI();this.updateControlCooldowns(time);const rem=Math.max(0,this.skillReadyAt-time);if(this.skillText)this.skillText.setText(rem<=0?'Skill READY':`Skill ${(rem/1000).toFixed(1)}s`)}
   handleRelicChoiceKeys(){if(!this.keys||!this.relicChoiceOpen||!this.relicChoices)return;let idx=-1;if(Phaser.Input.Keyboard.JustDown(this.keys.choice1))idx=0;else if(Phaser.Input.Keyboard.JustDown(this.keys.choice2))idx=1;else if(Phaser.Input.Keyboard.JustDown(this.keys.choice3))idx=2;if(idx>=0&&this.relicChoices[idx]){const c=this.relicChoices[idx];this.selectRelic(c.id,c.source);}}
   handlePlayer(time){const b=this.player.body,left=this.joystickX<-.25||this.keys?.left.isDown||this.keys?.left2.isDown,right=this.joystickX>.25||this.keys?.right.isDown||this.keys?.right2.isDown;if(!this.isDashing){if(left){this.player.setVelocityX(-250);this.facing=-1;this.player.setFlipX(true)}else if(right){this.player.setVelocityX(250);this.facing=1;this.player.setFlipX(false)}else this.player.setVelocityX(0)}if(this.consume('jump',this.keys?.jump)&&b.blocked.down)this.player.setVelocityY(-510);if(this.consume('dash',this.keys?.dash)&&this.canDash)this.doDash(time);if(this.consume('attack',this.keys?.attack)&&this.canAttack)this.attack(time);if(this.consume('skill',this.keys?.skill)&&time>=this.skillReadyAt)this.skill(time)}
   doDash(time){const cd=this.getDashCooldown(),speed=this.hasRelic('wind_step')?760:650;this.canDash=false;this.dashReadyAt=time+cd;this.isDashing=true;this.invincibleUntil=time+190;this.animLockUntil=time+210;this.setKaiTexture(this.kaiTex.dash);this.player.setVelocityX(this.facing*speed).setTint(C.cyan);this.createDashTrail();if(this.hasRelic('thunder_dash')){this.applyThunderDash();this.time.delayedCall(110,()=>this.applyThunderDash());this.time.delayedCall(210,()=>this.applyThunderDash());}this.time.delayedCall(190,()=>{this.isDashing=false;this.player.clearTint()});this.time.delayedCall(cd,()=>this.canDash=true)}
-  attack(time){this.canAttack=false;if(time>this.comboExpire)this.attackStep=0;this.attackStep=this.attackStep%3+1;this.comboExpire=time+520;const atkCd=this.attackStep===3?280:185;this.attackReadyAt=time+atkCd;this.animLockUntil=time+(this.attackStep===3?260:180);this.setKaiTexture(this.kaiTex['attack'+this.attackStep]);let dmg=[0,12,15,25][this.attackStep];if(this.hasRelic('heavy_impact')&&this.attackStep===3)dmg+=18;const reach=this.attackStep===3?105:82;this.fxSlash(this.player.x+this.facing*55,this.player.y-5,this.attackStep===3?1.3:1);for(const e of this.enemies){if(e.active&&Phaser.Math.Distance.Between(this.player.x,this.player.y,e.sprite.x,e.sprite.y)<reach+45){this.hitEnemy(e,dmg);if(this.hasRelic('fire_blade')&&Math.random()<0.35)this.applyBurn(e);if(this.hasRelic('heavy_impact')&&this.attackStep===3)this.bindEnemy(e,700);}}if(this.bossActive&&this.boss.active&&Phaser.Math.Distance.Between(this.player.x,this.player.y,this.boss.x,this.boss.y)<reach+100){this.hitBoss(dmg);if(this.hasRelic('fire_blade')&&Math.random()<0.35)this.applyBossBurn();if(this.hasRelic('heavy_impact')&&this.attackStep===3)this.bossSlowUntil=this.time.now+650;}this.time.delayedCall(atkCd,()=>this.canAttack=true)}
-  skill(time){const cd=this.getSkillCooldown();this.skillReadyAt=time+cd;this.animLockUntil=time+360;this.setKaiTexture(this.kaiTex.skill);this.createSkillBurst(this.player.x+this.facing*50,this.player.y);const surge=this.hasRelic('relic_surge'),root=this.hasRelic('root_prison');const wave=this.physics.add.sprite(this.player.x+this.facing*55,this.player.y-6,'slash').setScale(surge?1.75:1.4,surge?2.95:2.5).setTint(root?0x6fff9a:0x8effff);wave.body.setAllowGravity(false);wave.setVelocityX(this.facing*(surge?820:720));const ev=this.time.addEvent({delay:35,repeat:22,callback:()=>{if(!wave.active)return;for(const e of this.enemies){if(e.active&&Phaser.Math.Distance.Between(wave.x,wave.y,e.sprite.x,e.sprite.y)<(surge?92:75)){this.hitEnemy(e,surge?48:34);if(root)this.bindEnemy(e,1800);wave.destroy();return}}if(this.bossActive&&this.boss.active&&Phaser.Math.Distance.Between(wave.x,wave.y,this.boss.x,this.boss.y)<(surge?130:110)){this.hitBoss(surge?48:34);if(root){this.bossSlowUntil=this.time.now+1800;this.createRootFx(this.boss.x,this.boss.y+42);}wave.destroy()}}});this.time.delayedCall(1050,()=>{ev.remove();if(wave.active)wave.destroy()})}
-  fxSlash(x,y,s=1){const q=this.add.sprite(x,y,'slash').setScale(s,1.5*s).setTint(C.cyan).setAlpha(.85);const arc=this.add.graphics({x,y}).setDepth(11);arc.lineStyle(6*s,0x8effff,.9);arc.beginPath();arc.arc(0,0,58*s,this.facing>0?-0.8:Math.PI-0.8,this.facing>0?0.8:Math.PI+0.8,false);arc.strokePath();arc.lineStyle(2*s,0xffffff,.85);arc.beginPath();arc.arc(0,0,70*s,this.facing>0?-0.55:Math.PI-0.55,this.facing>0?0.55:Math.PI+0.55,false);arc.strokePath();this.tweens.add({targets:q,alpha:0,scaleX:s*1.4,duration:120,onComplete:()=>q.destroy()});this.tweens.add({targets:arc,alpha:0,scale:1.25,duration:160,onComplete:()=>arc.destroy()})}
-  hitEnemy(e,dmg){if(!e.active)return;e.hp-=dmg;e.sprite.setTint(0xffffff);this.cameras.main.shake(45,.0025);this.createImpactSpark(e.sprite.x,e.sprite.y-18,e.type==='elite'?C.gold:C.cyan);this.time.delayedCall(70,()=>e.active&&e.sprite.clearTint());if(e.hp<=0){e.active=false;e.sprite.disableBody(true,true);this.coins+=e.type==='elite'?30:10;this.spawnCoinText(e.sprite.x,e.sprite.y,e.type==='elite'?30:10);if(this.hasRelic('blood_pact'))this.healPlayer(e.type==='elite'?18:8);if(e.type==='elite'){this.flash('ELITE DEFEATED • RELIC FOUND',900);if(!this.eliteRelicDropped){this.eliteRelicDropped=true;this.time.delayedCall(420,()=>this.showRelicChoices('elite'));}}}}
+  attack(time){this.canAttack=false;if(time>this.comboExpire)this.attackStep=0;this.attackStep=this.attackStep%3+1;if(this.runStats)this.runStats.bestCombo=Math.max(this.runStats.bestCombo,this.attackStep);this.comboExpire=time+520;const atkCd=this.attackStep===3?285:185;this.attackReadyAt=time+atkCd;this.animLockUntil=time+(this.attackStep===3?255:175);this.setKaiTexture(this.kaiTex['attack'+this.attackStep]);let dmg=[0,12,15,25][this.attackStep];if(this.hasRelic('heavy_impact')&&this.attackStep===3)dmg+=14;const reach=this.attackStep===3?96:74;this.fxSlash(this.player.x+this.facing*52,this.player.y-5,this.attackStep===3?1.22:0.96);for(const e of this.enemies){const yGap=e.type==='elite'?18:10;const behind=e.type==='elite'?34:18;if(e.active&&this.canMeleeHit(e.sprite,reach+(e.type==='elite'?38:20),yGap,behind)){this.hitEnemy(e,dmg);if(this.hasRelic('fire_blade')&&Math.random()<0.28)this.applyBurn(e);if(this.hasRelic('heavy_impact')&&this.attackStep===3)this.bindEnemy(e,560);}}if(this.bossActive&&this.boss.active&&this.canMeleeHit(this.boss,reach+98,30,58)){this.hitBoss(dmg);if(this.hasRelic('fire_blade')&&Math.random()<0.28)this.applyBossBurn();if(this.hasRelic('heavy_impact')&&this.attackStep===3)this.bossSlowUntil=this.time.now+560;}this.time.delayedCall(atkCd,()=>this.canAttack=true)}
+  skill(time){const cd=this.getSkillCooldown();this.skillReadyAt=time+cd;this.animLockUntil=time+360;this.setKaiTexture(this.kaiTex.skill);this.createSkillBurst(this.player.x+this.facing*50,this.player.y);const surge=this.hasRelic('relic_surge'),root=this.hasRelic('root_prison');const wave=this.physics.add.sprite(this.player.x+this.facing*55,this.player.y-6,this.textures.exists('vfxSlashCrescent')?'vfxSlashCrescent':'slash').setScale(surge?1.75:1.4,surge?2.95:2.5).setTint(root?0x6fff9a:0x8effff);wave.body.setAllowGravity(false);wave.setVelocityX(this.facing*(surge?820:720));const ev=this.time.addEvent({delay:35,repeat:22,callback:()=>{if(!wave.active)return;for(const e of this.enemies){if(e.active&&Phaser.Math.Distance.Between(wave.x,wave.y,e.sprite.x,e.sprite.y)<(surge?92:75)){this.hitEnemy(e,surge?48:34);if(root)this.bindEnemy(e,1800);wave.destroy();return}}if(this.bossActive&&this.boss.active&&Phaser.Math.Distance.Between(wave.x,wave.y,this.boss.x,this.boss.y)<(surge?130:110)){this.hitBoss(surge?48:34);if(root){this.bossSlowUntil=this.time.now+1800;this.createRootFx(this.boss.x,this.boss.y+42);}wave.destroy()}}});this.time.delayedCall(1050,()=>{ev.remove();if(wave.active)wave.destroy()})}
+  fxSlash(x,y,s=1){const key=this.textures.exists('vfxSlashCrescent')?'vfxSlashCrescent':'slash';const q=this.add.sprite(x,y,key).setDepth(15).setScale(this.facing>0?s*0.72:-s*0.72,s*0.72).setAlpha(.9);if(key==='slash')q.setScale(s,1.5*s).setTint(C.cyan);const arc=this.add.graphics({x,y}).setDepth(16);arc.lineStyle(5*s,0x8effff,.65);arc.beginPath();arc.arc(0,0,60*s,this.facing>0?-0.8:Math.PI-0.8,this.facing>0?0.8:Math.PI+0.8,false);arc.strokePath();arc.lineStyle(2*s,0xffffff,.85);arc.beginPath();arc.arc(0,0,73*s,this.facing>0?-0.55:Math.PI-0.55,this.facing>0?0.55:Math.PI+0.55,false);arc.strokePath();this.tweens.add({targets:q,alpha:0,scaleX:q.scaleX*1.22,scaleY:q.scaleY*1.22,duration:155,onComplete:()=>q.destroy()});this.tweens.add({targets:arc,alpha:0,scale:1.35,duration:190,onComplete:()=>arc.destroy()})}
+  hitEnemy(e,dmg){if(!e.active)return;const dealt=Math.min(dmg,e.hp);e.hp-=dmg;if(this.runStats)this.runStats.damageDealt+=dealt;this.setEnemyTexture(e,'hurt');e.sprite.setTint(0xffffff);this.cameras.main.shake(45,.0025);this.createImpactSpark(e.sprite.x,e.sprite.y-18,e.type==='elite'?C.gold:C.cyan);this.time.delayedCall(90,()=>{if(e.active){e.sprite.clearTint();this.setEnemyTexture(e,'idle');}});if(e.hp<=0){e.active=false;this.recordKill(e.type);e.sprite.body.enable=false;this.setEnemyTexture(e,'death');e.sprite.clearTint();this.tweens.add({targets:e.sprite,alpha:0,y:e.sprite.y-16,scale:e.type==='elite'?0.92:0.88,duration:360,onComplete:()=>e.sprite.disableBody(true,true)});const reward=e.type==='elite'?30:10;this.addCoins(reward);this.spawnCoinText(e.sprite.x,e.sprite.y,reward);this.createDeathBurst(e.sprite.x,e.sprite.y-14,e.type==='elite'?C.gold:C.cyan);if(this.hasRelic('blood_pact'))this.healPlayer(e.type==='elite'?16:7);this.tryGrantAreaReward(e.areaId);if(e.type==='elite'){this.flash('ELITE DEFEATED • RELIC FOUND',900);if(!this.eliteRelicDropped){this.eliteRelicDropped=true;this.time.delayedCall(420,()=>this.showRelicChoices('elite'));}}}}
   updatePlayerVisual(time){
     if(this.ended){this.setKaiTexture(this.kaiTex.death);return}
     this.player.setFlipX(this.facing<0);
@@ -444,6 +1005,10 @@ class AdventureScene extends Phaser.Scene{
     this.setKaiTexture(tex);
   }
   createDashTrail(){
+    if(this.textures.exists('vfxDashTrail')){
+      const tr=this.add.image(this.player.x-this.facing*54,this.player.y+2,'vfxDashTrail').setDepth(13).setAlpha(0.58).setScale(this.facing>0?0.68:-0.68,0.68);
+      this.tweens.add({targets:tr,alpha:0,x:tr.x-this.facing*92,scaleX:tr.scaleX*1.35,duration:260,onComplete:()=>tr.destroy()});
+    }
     for(let i=0;i<3;i++){
       const ghost=this.add.image(this.player.x-this.facing*(18+i*18),this.player.y,(this.kaiTex.runFrames||[this.kaiTex.run])[i%((this.kaiTex.runFrames||[this.kaiTex.run]).length)]).setAlpha(0.22-i*0.045).setTint(C.cyan).setFlipX(this.facing<0).setDepth(this.player.depth-1);
       this.tweens.add({targets:ghost,alpha:0,x:ghost.x-this.facing*34,duration:220+i*40,onComplete:()=>ghost.destroy()});
@@ -454,55 +1019,70 @@ class AdventureScene extends Phaser.Scene{
     burst.lineStyle(4,C.cyan,0.9);burst.strokeCircle(0,0,24);burst.lineStyle(2,0xeaffff,0.8);burst.strokeCircle(0,0,38);
     this.tweens.add({targets:burst,scale:1.7,alpha:0,duration:360,onComplete:()=>burst.destroy()});
   }
-  updateEnemies(){for(const e of this.enemies){if(!e.active)continue;if(this.boundUntil[e.id]&&this.time.now<this.boundUntil[e.id]){e.sprite.setVelocityX(0);continue;}const d=this.player.x-e.sprite.x;if(Math.abs(d)<390)e.sprite.setVelocityX(Math.sign(d)*e.speed);else e.sprite.setVelocityX(0)}}
-  keepActorsAboveFloor(){for(const e of this.enemies){if(!e.active)continue;if(e.sprite.y>e.floorY+4){e.sprite.setY(e.floorY);e.sprite.setVelocityY(0)}}if(this.boss&&this.boss.active&&this.boss.y>FLOOR_TOP-62){this.boss.setY(FLOOR_TOP-62);this.boss.setVelocityY(0)}}
+  updateEnemies(){for(const e of this.enemies){if(!e.active)continue;if(this.boundUntil[e.id]&&this.time.now<this.boundUntil[e.id]){e.sprite.setVelocityX(0);this.setEnemyTexture(e,'idle');continue;}const d=this.player.x-e.sprite.x;if(Math.abs(d)<390){e.sprite.setVelocityX(Math.sign(d)*e.speed);e.sprite.setFlipX(d<0);this.setEnemyTexture(e,e.type==='elite'&&Math.abs(d)<95?'attack':'move');}else{e.sprite.setVelocityX(0);this.setEnemyTexture(e,'idle');}}}
+  keepActorsAboveFloor(){for(const e of this.enemies){if(!e.active)continue;if(e.sprite.y>e.floorY+4){e.sprite.setY(e.floorY);e.sprite.setVelocityY(0)}}if(this.boss&&this.boss.active&&this.boss.y>FLOOR_TOP-76){this.boss.setY(FLOOR_TOP-76);this.boss.setVelocityY(0)}}
   spawnCoinText(x,y,n){const t=this.add.text(x,y-40,`+${n} COIN`,{fontSize:'18px',fontStyle:'bold',color:'#ffd56a'}).setOrigin(.5);this.tweens.add({targets:t,y:y-85,alpha:0,duration:700,onComplete:()=>t.destroy()})}
-  updateAdventure(){if(this.player.x>1700&&this.checkpointX<1700){this.checkpointX=1760;this.playerHP=Math.min(100,this.playerHP+25);this.flash('CHECKPOINT ACTIVATED • HP RESTORED',950)}if(!this.chestOpened&&this.player.x>2500&&this.player.x<2700&&this.miniBoss&&!this.miniBoss.active){this.chestOpened=true;this.coins+=50;this.chest.setTint(0xffe08a);this.flash('TREASURE CHEST • +50 COIN',950)}if(!this.bossActive&&this.player.x>3500){this.startBoss()}if(this.portalUnlocked&&this.player.x>4020){this.ended=true;this.flash('WORLD 1 CLEAR\nKAI Official Sprite Integration Complete • Press R',999999)}}
-  startBoss(){this.bossActive=true;this.boss.setVisible(true).setActive(true);this.boss.body.enable=true;this.bossLabel.setVisible(true);this.bossBar.setVisible(true);this.bossNextAttack=this.time.now+1200;this.objective.setText('OBJECTIVE: Defeat the Forest Guardian');this.flash('BOSS ENCOUNTER',900)}
-  updateBoss(time){if(!this.bossActive||!this.boss.active||this.bossBusy)return;if(this.bossHP<=405&&this.bossPhase===1){this.bossPhase=2;this.boss.setTint(0xff7777);this.flash('PHASE 2 • RAGE',1000)}if(time<this.bossNextAttack)return;const c=Phaser.Math.Between(0,2);c===0?this.bossCharge():c===1?this.bossSlam():this.bossRoots();const slowed=time<this.bossSlowUntil;this.bossNextAttack=time+(this.bossPhase===1?(slowed?2750:2050):(slowed?2050:1450))}
-  bossCharge(){this.bossBusy=true;const dir=Math.sign(this.player.x-this.boss.x)||-1,w=this.add.rectangle(this.boss.x+dir*220,625,380,38,C.warning,.25);this.tweens.add({targets:w,alpha:.7,yoyo:true,repeat:2,duration:120});this.time.delayedCall(540,()=>{w.destroy();this.boss.setVelocityX(dir*(this.bossPhase===1?480:620));this.time.delayedCall(450,()=>{this.boss.setVelocityX(0);this.bossBusy=false})})}
-  bossSlam(){this.bossBusy=true;const z=this.add.circle(this.boss.x,640,150,C.warning,.18);this.tweens.add({targets:z,scale:1.15,alpha:.5,duration:500});this.time.delayedCall(600,()=>{this.cameras.main.shake(180,.008);if(Phaser.Math.Distance.Between(this.player.x,this.player.y,this.boss.x,this.boss.y)<180)this.takeDamage(this.bossPhase===1?18:24);z.destroy();this.time.delayedCall(350,()=>this.bossBusy=false)})}
-  bossRoots(){this.bossBusy=true;const x=Phaser.Math.Clamp(this.player.x+Phaser.Math.Between(-80,80),3550,4230),w=this.add.rectangle(x,630,95,16,C.warning,.45);this.tweens.add({targets:w,alpha:.9,yoyo:true,repeat:3,duration:120});this.time.delayedCall(650,()=>{w.destroy();const r=this.add.rectangle(x,575,46,130,0x6f8f45).setOrigin(.5,1);if(Math.abs(this.player.x-x)<65)this.takeDamage(this.bossPhase===1?16:22);this.time.delayedCall(500,()=>r.destroy());this.time.delayedCall(680,()=>this.bossBusy=false)})}
-  hitBoss(dmg){this.bossHP=Math.max(0,this.bossHP-dmg);this.boss.setTint(0xffffff);this.cameras.main.shake(55,.003);this.createImpactSpark(this.boss.x,this.boss.y-22,this.bossPhase===2?C.red:C.cyan);this.time.delayedCall(70,()=>{if(this.boss.active)this.bossPhase===2?this.boss.setTint(0xff7777):this.boss.clearTint()});if(this.bossHP<=0){this.boss.disableBody(true,true);if(this.hasRelic('blood_pact'))this.healPlayer(35);if(!this.bossRelicDropped){this.bossRelicDropped=true;this.flash('BOSS DEFEATED • ANCIENT RELIC UNLOCKED',1100);this.time.delayedCall(550,()=>this.showRelicChoices('boss'));}else this.openPortalAfterRelic();}}
+
+  updateAdventure(){
+    if(this.player.x>1700&&this.checkpointX<1700){this.checkpointX=1760;this.playerHP=Math.min(100,this.playerHP+22);this.flash('CHECKPOINT ACTIVATED • HP RESTORED',950)}
+    if(this.player.x>3650&&this.checkpointX<3650&&this.rootGateOpened){this.checkpointX=3700;this.playerHP=Math.min(100,this.playerHP+16);this.flash('ROOT GATE CHECKPOINT • HP RESTORED',950)}
+    if(!this.chestOpened&&this.player.x>2500&&this.player.x<2700&&this.miniBoss&&!this.miniBoss.active){
+      this.chestOpened=true;this.addCoins(34);this.healPlayer(8);this.chest.setTint(0xffe08a);this.flash('TREASURE CHEST • +34 COIN • +8 HP',950);
+      this.time.delayedCall(420,()=>{if(!this.relicChoiceOpen&&!this.ended)this.showRelicChoices('chest');});
+    }
+    if(!this.rootGateOpened&&this.player.x>3550&&this.player.x<3720&&this.time.now>(this.nextGateReminder||0)){
+      this.nextGateReminder=this.time.now+2200;
+      this.tryOpenRootGate();
+    }
+    if(!this.bossActive&&this.rootGateOpened&&this.player.x>4400){this.startBoss()}
+    if(this.portalUnlocked&&this.player.x>5020){this.finishRun(true)}
+  }
+
+  startBoss(){this.bossActive=true;this.boss.setVisible(true).setActive(true);this.boss.body.enable=true;this.setBossTexture('idle');this.bossLabel.setVisible(true);this.bossBar.setVisible(true);this.bossNextAttack=this.time.now+1200;this.objective.setText('OBJECTIVE: Defeat the Forest Guardian');this.flash('BOSS ENCOUNTER',900)}
+  updateBoss(time){if(!this.bossActive||!this.boss.active||this.bossBusy)return;if(this.bossHP<=this.bossMaxHP*0.45&&this.bossPhase===1){this.bossPhase=2;this.setBossTexture('rage');this.boss.setTint(0xff7777);this.createDeathBurst(this.boss.x,this.boss.y-40,C.red);this.flash('PHASE 2 • RAGE',1000)}if(time<this.bossNextAttack)return;const c=Phaser.Math.Between(0,2);c===0?this.bossCharge():c===1?this.bossSlam():this.bossRoots();const slowed=time<this.bossSlowUntil;this.bossNextAttack=time+(this.bossPhase===1?(slowed?2950:2200):(slowed?2200:1580))}
+  bossCharge(){this.bossBusy=true;this.setBossTexture('charge');const dir=Math.sign(this.player.x-this.boss.x)||-1,w=this.createBossWarning(this.boss.x+dir*220,625,420,54,'charge');this.time.delayedCall(540,()=>{w.destroy();this.boss.setVelocityX(dir*(this.bossPhase===1?450:585));this.time.delayedCall(450,()=>{this.boss.setVelocityX(0);this.setBossTexture(this.bossPhase===2?'rage':'idle');this.bossBusy=false})})}
+  bossSlam(){this.bossBusy=true;this.setBossTexture('slam');const z=this.add.circle(this.boss.x,640,150,C.warning,.18).setDepth(17);this.tweens.add({targets:z,scale:1.18,alpha:.55,duration:500});this.time.delayedCall(600,()=>{this.cameras.main.shake(180,.008);this.createGroundCrack(this.boss.x,646);if(Phaser.Math.Distance.Between(this.player.x,this.player.y,this.boss.x,this.boss.y)<180)this.takeDamage(this.bossPhase===1?15:20);z.destroy();this.time.delayedCall(350,()=>{this.setBossTexture(this.bossPhase===2?'rage':'idle');this.bossBusy=false})})}
+  bossRoots(){this.bossBusy=true;this.setBossTexture('root');const x=Phaser.Math.Clamp(this.player.x+Phaser.Math.Between(-80,80),3550,4230),w=this.createBossWarning(x,630,130,36,'root');this.time.delayedCall(650,()=>{w.destroy();this.createRootFx(x,610);const r=this.add.rectangle(x,575,46,130,0x6f8f45,0.42).setOrigin(.5,1).setDepth(16);if(Math.abs(this.player.x-x)<65)this.takeDamage(this.bossPhase===1?16:22);this.time.delayedCall(500,()=>r.destroy());this.time.delayedCall(680,()=>{this.setBossTexture(this.bossPhase===2?'rage':'idle');this.bossBusy=false})})}
+  hitBoss(dmg){const dealt=Math.min(dmg,this.bossHP);this.bossHP=Math.max(0,this.bossHP-dmg);if(this.runStats)this.runStats.damageDealt+=dealt;this.boss.setTint(0xffffff);this.cameras.main.shake(55,.003);this.createImpactSpark(this.boss.x,this.boss.y-22,this.bossPhase===2?C.red:C.cyan);this.time.delayedCall(80,()=>{if(this.boss.active){this.bossPhase===2?this.boss.setTint(0xff7777):this.boss.clearTint();if(!this.bossBusy)this.setBossTexture(this.bossPhase===2?'rage':'idle');}});if(this.bossHP<=0){if(this.runStats)this.runStats.bossDefeated=true;this.setBossTexture('death');this.boss.body.enable=false;this.createDeathBurst(this.boss.x,this.boss.y-40,C.red);this.tweens.add({targets:this.boss,alpha:0,scale:0.92,duration:520,onComplete:()=>this.boss.disableBody(true,true)});if(this.hasRelic('blood_pact'))this.healPlayer(30);if(!this.bossRelicDropped){this.bossRelicDropped=true;this.flash('BOSS DEFEATED • ANCIENT RELIC UNLOCKED',1100);this.time.delayedCall(550,()=>this.showRelicChoices('boss'));}else this.openPortalAfterRelic();}}
   contactDamage(enemy,dmg){if(this.time.now<this.invincibleUntil)return;this.takeDamage(dmg);this.player.setVelocityX(Math.sign(this.player.x-enemy.x)*260);this.player.setVelocityY(-180)}
-  takeDamage(dmg){if(this.time.now<this.invincibleUntil||this.ended)return;if(this.hasRelic('guardian_shell'))dmg=Math.ceil(dmg*0.78);this.playerHP=Math.max(0,this.playerHP-dmg);this.invincibleUntil=this.time.now+700;this.hurtUntil=this.time.now+350;this.setKaiTexture(this.kaiTex.hurt);this.player.setTint(0xff7777);this.cameras.main.shake(100,.006);this.showDamageText(this.player.x,this.player.y-54,dmg,0xff6b6b,'-');this.time.delayedCall(150,()=>this.player.clearTint());if(this.playerHP<=0){this.player.setPosition(this.checkpointX,FLOOR_TOP-38);this.playerHP=100;this.invincibleUntil=this.time.now+1600;this.flash('KAI FALLEN • RESPAWN AT CHECKPOINT',1200)}}
-  drawUI(){this.hpBar.clear().fillStyle(0x183434,.95).fillRoundedRect(118,40,218,18,8).fillStyle(C.green,1).fillRoundedRect(118,40,218*(this.playerHP/100),18,8);this.coinText.setText(`COIN ${this.coins}`);this.bossBar.clear().fillStyle(0x26161a,.95).fillRoundedRect(W/2-280,50,560,16,8).fillStyle(C.red,1).fillRoundedRect(W/2-280,50,560*(this.bossHP/900),16,8);this.updateRelicHud()}
+  takeDamage(dmg){if(this.time.now<this.invincibleUntil||this.ended)return;if(this.hasRelic('guardian_shell'))dmg=Math.ceil(dmg*0.78);if(this.runStats)this.runStats.damageTaken+=dmg;this.playerHP=Math.max(0,this.playerHP-dmg);this.invincibleUntil=this.time.now+700;this.hurtUntil=this.time.now+350;this.setKaiTexture(this.kaiTex.hurt);this.player.setTint(0xff7777);this.cameras.main.shake(100,.006);this.showDamageText(this.player.x,this.player.y-54,dmg,0xff6b6b,'-');this.time.delayedCall(150,()=>this.player.clearTint());if(this.playerHP<=0){this.setKaiTexture(this.kaiTex.death);this.flash('KAI FALLEN • RUN FAILED',900);this.time.delayedCall(450,()=>this.finishRun(false));}}
+  drawUI(){this.hpBar.clear().fillStyle(0x183434,.95).fillRoundedRect(118,40,218,18,8).fillStyle(C.green,1).fillRoundedRect(118,40,218*(this.playerHP/100),18,8);this.coinText.setText(`COIN ${this.coins}`);this.bossBar.clear().fillStyle(0x26161a,.95).fillRoundedRect(W/2-280,50,560,16,8).fillStyle(C.red,1).fillRoundedRect(W/2-280,50,560*(this.bossHP/this.bossMaxHP),16,8);this.updateRelicHud();this.updatePuzzleHud&&this.updatePuzzleHud()}
   hasRelic(id){return this.relics.includes(id)}
-  getDashCooldown(){return this.hasRelic('wind_step')?560:780}
-  getSkillCooldown(){return this.hasRelic('relic_surge')?3600:5000}
+  getDashCooldown(){return this.hasRelic('wind_step')?520:720}
+  getSkillCooldown(){return this.hasRelic('relic_surge')?3400:4700}
   healPlayer(amount){const before=this.playerHP;this.playerHP=Math.min(100,this.playerHP+amount);if(this.playerHP>before)this.showDamageText(this.player.x,this.player.y-70,this.playerHP-before,0x6fcf97,'+')}
   showDamageText(x,y,n,color=0xffffff,prefix=''){const t=this.add.text(x,y,`${prefix}${n}`,{fontSize:'18px',fontStyle:'bold',color:'#'+color.toString(16).padStart(6,'0'),stroke:'#061015',strokeThickness:4}).setOrigin(.5).setDepth(80);this.tweens.add({targets:t,y:y-36,alpha:0,duration:650,onComplete:()=>t.destroy()})}
   applyBurn(e){if(!e||!e.active)return;this.burnTimers[e.id]=(this.burnTimers[e.id]||0)+1;e.sprite.setTint(0xff8b44);this.createBurnFx(e.sprite.x,e.sprite.y);let ticks=0;const ev=this.time.addEvent({delay:650,repeat:3,callback:()=>{if(!e.active){ev.remove();return}ticks++;this.hitEnemy(e,5);this.createBurnFx(e.sprite.x,e.sprite.y);if(ticks>=4)ev.remove();}})}
   applyBossBurn(){if(!this.boss.active)return;this.createBurnFx(this.boss.x,this.boss.y);let ticks=0;const ev=this.time.addEvent({delay:650,repeat:3,callback:()=>{if(!this.boss.active){ev.remove();return}ticks++;this.hitBoss(5);this.createBurnFx(this.boss.x,this.boss.y);if(ticks>=4)ev.remove();}})}
   bindEnemy(e,ms){if(!e||!e.active)return;this.boundUntil[e.id]=this.time.now+ms;e.sprite.setVelocityX(0);e.sprite.setTint(0x8dff9c);this.createRootFx(e.sprite.x,e.sprite.y+18);this.time.delayedCall(ms,()=>{if(e.active)e.sprite.clearTint()})}
   applyThunderDash(){for(const e of this.enemies){if(e.active&&Phaser.Math.Distance.Between(this.player.x,this.player.y,e.sprite.x,e.sprite.y)<92){this.hitEnemy(e,22);this.createLightningFx(e.sprite.x,e.sprite.y);}}if(this.bossActive&&this.boss.active&&Phaser.Math.Distance.Between(this.player.x,this.player.y,this.boss.x,this.boss.y)<130){this.hitBoss(18);this.createLightningFx(this.boss.x,this.boss.y);}}
-  createBurnFx(x,y){const fx=this.add.circle(x,y-18,18,0xff7138,0.28).setDepth(14);this.tweens.add({targets:fx,scale:1.65,alpha:0,duration:360,onComplete:()=>fx.destroy()})}
-  createLightningFx(x,y){const g=this.add.graphics({x,y}).setDepth(14);g.lineStyle(4,0x66e8ff,0.9);g.beginPath();g.moveTo(-28,-34);g.lineTo(0,-6);g.lineTo(-12,-3);g.lineTo(24,34);g.strokePath();this.tweens.add({targets:g,alpha:0,scale:1.25,duration:300,onComplete:()=>g.destroy()})}
-  createRootFx(x,y){const g=this.add.graphics({x,y}).setDepth(13);g.lineStyle(5,0x7cf082,0.8);for(let i=-2;i<=2;i++){g.beginPath();g.moveTo(i*12,30);g.lineTo(i*8,-22);g.lineTo(i*18,-40);g.strokePath();}this.tweens.add({targets:g,alpha:0,y:y-12,duration:720,onComplete:()=>g.destroy()})}
+  createBurnFx(x,y){const fx=this.add.circle(x,y-18,20,0xff7138,0.22).setDepth(14);const ember=this.add.circle(x+Phaser.Math.Between(-8,8),y-34,5,0xffc65c,0.75).setDepth(15);this.tweens.add({targets:fx,scale:1.9,alpha:0,duration:420,onComplete:()=>fx.destroy()});this.tweens.add({targets:ember,y:ember.y-36,alpha:0,duration:520,onComplete:()=>ember.destroy()})}
+  createLightningFx(x,y){const g=this.add.graphics({x,y}).setDepth(18);g.lineStyle(5,0x66e8ff,0.95);g.beginPath();g.moveTo(-34,-42);g.lineTo(2,-10);g.lineTo(-10,-2);g.lineTo(30,42);g.strokePath();g.lineStyle(2,0xffffff,0.8);g.beginPath();g.moveTo(-20,-34);g.lineTo(10,-2);g.lineTo(0,4);g.lineTo(24,35);g.strokePath();this.tweens.add({targets:g,alpha:0,scale:1.38,duration:330,onComplete:()=>g.destroy()})}
+  createRootFx(x,y){if(this.textures.exists('vfxRootVine')){const v=this.add.image(x,y-18,'vfxRootVine').setDepth(15).setAlpha(0.9).setScale(0.82);this.tweens.add({targets:v,alpha:0,y:v.y-18,scale:1.08,duration:760,onComplete:()=>v.destroy()});return;}const g=this.add.graphics({x,y}).setDepth(13);g.lineStyle(5,0x7cf082,0.8);for(let i=-2;i<=2;i++){g.beginPath();g.moveTo(i*12,30);g.lineTo(i*8,-22);g.lineTo(i*18,-40);g.strokePath();}this.tweens.add({targets:g,alpha:0,y:y-12,duration:720,onComplete:()=>g.destroy()})}
   createImpactSpark(x,y,color=C.cyan){
+    if(this.textures.exists('vfxHitSpark')){
+      const sp=this.add.image(x,y,'vfxHitSpark').setDepth(20).setAlpha(0.9).setScale(0.55).setTint(color);
+      this.tweens.add({targets:sp,scale:1.05,alpha:0,angle:Phaser.Math.Between(-28,28),duration:290,onComplete:()=>sp.destroy()});
+      return;
+    }
     const g=this.add.graphics({x,y}).setDepth(18);
     g.lineStyle(3,color,0.92);
-    for(let i=0;i<8;i++){
-      const a=(Math.PI*2/8)*i;
-      g.beginPath();
-      g.moveTo(Math.cos(a)*8,Math.sin(a)*8);
-      g.lineTo(Math.cos(a)*Phaser.Math.Between(22,42),Math.sin(a)*Phaser.Math.Between(22,42));
-      g.strokePath();
-    }
+    for(let i=0;i<8;i++){const a=(Math.PI*2/8)*i;g.beginPath();g.moveTo(Math.cos(a)*8,Math.sin(a)*8);g.lineTo(Math.cos(a)*Phaser.Math.Between(22,42),Math.sin(a)*Phaser.Math.Between(22,42));g.strokePath();}
     g.fillStyle(0xffffff,0.75).fillCircle(0,0,8);
     this.tweens.add({targets:g,scale:1.3,alpha:0,duration:260,onComplete:()=>g.destroy()});
   }
+  createDeathBurst(x,y,color=C.cyan){for(let i=0;i<10;i++){const p=this.add.circle(x,y,Phaser.Math.Between(2,5),color,0.75).setDepth(60);this.tweens.add({targets:p,x:x+Phaser.Math.Between(-52,52),y:y+Phaser.Math.Between(-46,20),alpha:0,scale:0.25,duration:420+Phaser.Math.Between(0,220),onComplete:()=>p.destroy()});}}
   createRelicAcquireFx(color=C.cyan){
     const x=W/2,y=H/2;
-    const g=this.add.graphics({x,y}).setScrollFactor(0).setDepth(340);
+    if(this.textures.exists('vfxRelicAcquireRing')){
+      const ring=this.add.image(x,y,'vfxRelicAcquireRing').setScrollFactor(0).setDepth(340).setAlpha(0.95).setTint(color).setScale(0.56);
+      this.tweens.add({targets:ring,scale:1.12,alpha:0,angle:25,duration:650,onComplete:()=>ring.destroy()});
+    }
+    const g=this.add.graphics({x,y}).setScrollFactor(0).setDepth(341);
     g.lineStyle(5,color,0.9).strokeCircle(0,0,42);
     g.lineStyle(2,0xffffff,0.8).strokeCircle(0,0,68);
-    for(let i=0;i<12;i++){
-      const a=(Math.PI*2/12)*i;
-      g.lineStyle(2,color,0.65);
-      g.beginPath();g.moveTo(Math.cos(a)*76,Math.sin(a)*76);g.lineTo(Math.cos(a)*104,Math.sin(a)*104);g.strokePath();
-    }
-    this.tweens.add({targets:g,scale:1.45,alpha:0,duration:520,onComplete:()=>g.destroy()});
+    for(let i=0;i<16;i++){const a=(Math.PI*2/16)*i;g.lineStyle(2,color,0.65);g.beginPath();g.moveTo(Math.cos(a)*76,Math.sin(a)*76);g.lineTo(Math.cos(a)*112,Math.sin(a)*112);g.strokePath();}
+    this.tweens.add({targets:g,scale:1.55,alpha:0,duration:560,onComplete:()=>g.destroy()});
   }
   chooseRelicPool(source){const owned=new Set(this.relics);let pool=RELICS.filter(r=>!owned.has(r.id));if(source==='boss'){pool=pool.sort((a,b)=>(a.id==='root_prison'?-1:b.id==='root_prison'?1:0));}
     const shuffled=pool.sort(()=>Math.random()-0.5);return shuffled.slice(0,Math.min(3,shuffled.length));}
@@ -529,16 +1109,18 @@ class AdventureScene extends Phaser.Scene{
       const type=this.add.text(0,14,r.type,{fontSize:'12px',fontStyle:'bold',color:'#'+r.color.toString(16).padStart(6,'0')}).setOrigin(.5);
       const desc=this.add.text(0,62,r.desc,{fontSize:'14px',color:'#d8fffc',align:'center',wordWrap:{width:220}}).setOrigin(.5);
       const pick=this.add.text(0,118,'CHỌN RELIC',{fontSize:'13px',fontStyle:'bold',color:'#07171b',backgroundColor:'#f4c76b',padding:{x:18,y:8}}).setOrigin(.5);
-      const hit=this.add.zone(0,0,270,290).setOrigin(.5).setSize(270,290).setInteractive({useHandCursor:true});
+      const hit=this.add.zone(0,0,310,330).setOrigin(.5).setDepth(999).setInteractive({useHandCursor:true});
+      card.setInteractive(new Phaser.Geom.Rectangle(-143,-153,286,306), Phaser.Geom.Rectangle.Contains);
       const hoverOn=()=>{card.setScale(1.04);bg.setFillStyle(0x0b2d31,0.98);bg.setStrokeStyle(4,r.color,0.95)};
       const hoverOff=()=>{card.setScale(1);bg.setFillStyle(0x07171b,0.96);bg.setStrokeStyle(3,r.color,0.72)};
-      const choose=(pointer,localX,localY,event)=>{if(event&&event.stopPropagation)event.stopPropagation();this.selectRelic(r.id,source);};
-      hit.on('pointerover',hoverOn);hit.on('pointerout',hoverOff);hit.on('pointerdown',choose);hit.on('pointerup',choose);
+      let picked=false;
+      const choose=(pointer,localX,localY,event)=>{this.stopUiEvent(event);if(picked||!this.relicChoiceOpen)return;picked=true;this.selectRelic(r.id,source);};
+      [card,bg,pick,hit].forEach(o=>{o.on('pointerover',hoverOn);o.on('pointerout',hoverOff);o.on('pointerdown',choose);});
       card.add([bg,key,icon,title,type,desc,pick,hit]);
       layer.add(card);
     });
   }
-  selectRelic(id,source){if(!this.relicChoiceOpen||this.relics.includes(id))return;this.relics.push(id);const r=RELIC_BY_ID[id];this.flash(`${r.name.toUpperCase()} ACQUIRED`,900);this.createRelicAcquireFx(r.color);if(this.relicLayer){this.relicLayer.destroy();this.relicLayer=null;}this.relicChoices=[];this.relicChoiceOpen=false;this.physics.world.resume();this.updateRelicHud(true);if(source==='boss')this.openPortalAfterRelic();}
+  selectRelic(id,source){if(!this.relicChoiceOpen||this.relics.includes(id))return;this.relics.push(id);if(this.runStats)this.runStats.relicsCollected=this.relics.length;const r=RELIC_BY_ID[id];this.flash(`${r.name.toUpperCase()} ACQUIRED`,900);this.createRelicAcquireFx(r.color);if(this.relicLayer){this.relicLayer.destroy();this.relicLayer=null;}this.relicChoices=[];this.relicChoiceOpen=false;this.physics.world.resume();this.updateRelicHud(true);if(source==='boss')this.openPortalAfterRelic();}
   openPortalAfterRelic(){this.portalUnlocked=true;this.portal.setVisible(true);this.objective.setText('OBJECTIVE: Enter the Exit Portal');this.flash('VICTORY • EXIT PORTAL OPENED',1300)}
   updateRelicHud(force=false){if(!this.relicHud)return;if(!force&&this._lastRelicCount===this.relics.length)return;this._lastRelicCount=this.relics.length;this.relicHud.removeAll(true);this.relicHud.add(this.add.rectangle(0,0,390,70,0x061015,0.46).setOrigin(0));this.relicHud.add(this.add.text(12,8,'RELIC BUILD',{fontSize:'12px',fontStyle:'bold',color:'#8ff8f0'}));if(!this.relics.length){this.relicHud.add(this.add.text(12,31,'Chưa có Relic • Hạ Elite để chọn sức mạnh đầu tiên',{fontSize:'12px',color:'#b7d4d2'}));return;}this.relics.slice(0,5).forEach((id,i)=>{const r=RELIC_BY_ID[id];this.relicHud.add(this.add.image(24+i*66,43,'relic_'+id).setDisplaySize(36,36));this.relicHud.add(this.add.text(43+i*66,54,r.icon,{fontSize:'14px'}).setOrigin(.5));});if(this.relics.length>5)this.relicHud.add(this.add.text(346,32,`+${this.relics.length-5}`,{fontSize:'16px',fontStyle:'bold',color:'#f4c76b'}));}
   flash(text,duration){this.status.setText(text).setVisible(true).setAlpha(1);if(duration<999999)this.tweens.add({targets:this.status,alpha:0,delay:duration,duration:280,onComplete:()=>this.status.setVisible(false)})}

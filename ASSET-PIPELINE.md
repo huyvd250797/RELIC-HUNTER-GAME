@@ -1,42 +1,35 @@
-# RELIC HUNTER V0.4.2 – KAI Official Sprite Integration
+# RELIC HUNTER V0.6.1 – World 1 Puzzle Flow Fix & Difficulty Tuning
 
 ## Mục tiêu
+V0.6.1 cải thiện puzzle flow của World 1, buộc người chơi phải quan sát và thu đủ key item trước khi vào Boss Arena.
 
-V0.4.2 đưa bộ sprite KAI chính thức đầu tiên vào game dựa trên pipeline đã chuẩn hóa ở V0.4.1.
+## Puzzle Asset mới
 
-## Nguyên tắc
+```text
+public/assets/maps/whispering-forest/props/
+├── puzzle-moon-seal.png
+├── puzzle-thorn-seal.png
+└── puzzle-forest-seal.png
+```
 
-- Sprite KAI nằm trong `public/assets/characters/kai/`.
-- Game ưu tiên load asset thật.
-- Nếu thiếu file, game fallback về runtime texture để không crash.
-- Không thay đổi gameplay/combat logic khi thay sprite.
+## Luật Root Gate
 
-## Sprite KAI hiện có
+Root Gate mở khi đủ:
 
-- kai-idle.png
-- kai-run.png
-- kai-jump.png
-- kai-fall.png
-- kai-attack-1.png
-- kai-attack-2.png
-- kai-attack-3.png
-- kai-dash.png
-- kai-skill.png
-- kai-hurt.png
-- kai-death.png
+```text
+Moon Seal + Thorn Seal + Forest Rune
+```
 
-## Kích thước hiện tại
+Nếu thiếu, cổng không mở và game hiển thị thông báo seal còn thiếu.
 
-96x96 px / state.
+## Logic chính
 
-## Hướng nâng cấp tiếp theo
+- `createPuzzleToken()` tạo seal token.
+- `collectPuzzleToken()` thu Moon/Thorn Seal.
+- `collectForestRune()` thu Forest Rune nhưng chưa mở gate nếu thiếu seal.
+- `tryOpenRootGate()` kiểm tra đủ 3 dấu ấn.
+- `updatePuzzleHud()` cập nhật UI puzzle.
+- `canMeleeHit()` được siết chặt để không đánh xuyên tầng.
 
-- Tách run thành nhiều frame animation thật.
-- Tách idle breathing thành nhiều frame.
-- Tạo attack anticipation/recovery frame.
-- Tạo effect sprite sheet riêng cho Crescent Slash.
-- Tích hợp Enemy/Boss official sprites.
-
-## Bản tiếp theo
-
-V0.4.3 – Enemy & Boss Official Sprite Integration.
+## Bản kế tiếp
+V0.6.2 – World 1 Puzzle UX & Hint Polish.

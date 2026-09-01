@@ -1,8 +1,12 @@
-# VFX Official Asset Slots
+# VFX Assets – V0.4.4
 
-- slash/
-- dash/
-- hit/
-- relic/
+Các VFX asset đã thêm:
+- slash/slash-crescent.png
+- dash/dash-trail.png
+- hit/hit-spark.png
+- root/root-vine.png
+- boss/boss-warning-zone.png
+- boss/ground-slam-crack.png
+- relic/relic-acquire-ring.png
 
-V0.4.1 cho phép chuẩn hóa asset VFX trước khi thay VFX thật.
+Các hiệu ứng vẫn có fallback bằng graphics runtime nếu asset bị thiếu.

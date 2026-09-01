@@ -1,122 +1,106 @@
-# HuyVo Portfolio — V1.2.0 Media & Project Assets
+# RELIC HUNTER V0.6.1 – World 1 Puzzle Flow Fix & Difficulty Tuning
 
-A professional portfolio/CV web app built with Next.js, TypeScript, Supabase CMS and privacy-conscious analytics.
+Bản này nâng cấp từ **V0.6.0 – World 1 Content Expansion**.
 
-## Current version
+Trọng tâm: làm cho World 1 bớt chạy thẳng, buộc người chơi phải quan sát, thử đường nhảy, lấy đủ dấu ấn và suy nghĩ trước khi vượt qua Root Gate.
 
-**V1.2.0 — Media & Project Assets**
+## Nội dung chính
 
-## Main features
+### 1. Puzzle Flow mới: 3 dấu ấn mở Root Gate
 
-- Portfolio landing page
-- Professional CV sections
-- Project portfolio and project case-study detail pages
-- ATS-friendly `/resume`
-- Print / Save PDF resume support
-- Contact page and contact cards
-- SEO, sitemap, robots, manifest, OpenGraph and JSON-LD
-- Supabase-backed Real CMS Admin
-- `/admin` Light / Dark / System theme switcher
-- Visitor analytics dashboard in `/admin`
-- Media & Project Assets management in `/admin`
-- Fallback to `src/data/profile.ts` when Supabase is not configured
-
-## Media & Project Assets
-
-V1.2.0 adds URL-based media management. In `/admin → Media`, you can manage:
-
-- Profile avatar image URL
-- Resume/CV file URL
-- Project icon / initials
-- Project thumbnail image URL
-- Project case-study gallery assets
-- Asset type: Image, Screenshot, Diagram, Document, Video or Link
-- Asset caption and alt text
-
-Media is stored inside the existing `portfolio_profiles.data` JSONB field, so no extra Supabase table is required for this version.
-
-Use public URLs only. For confidential work screenshots, sanitize the image before publishing.
-
-## Analytics events
-
-V1.1.0+ tracks public-site interactions through `/api/analytics` and stores them in Supabase table `portfolio_events`:
-
-- `page_view`
-- `project_view`
-- `cta_click`
-- `resume_download`
-- `contact_click`
-
-Admin pages are not tracked.
-
-## Environment variables
-
-Create these variables on Vercel:
-
-```env
-NEXT_PUBLIC_SITE_URL=https://your-domain.com
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-ADMIN_PASSWORD=your-admin-password
-
-# Optional CMS
-SUPABASE_PORTFOLIO_TABLE=portfolio_profiles
-SUPABASE_PORTFOLIO_ID=default
-PORTFOLIO_REVALIDATE_SECONDS=60
-
-# Optional Analytics
-NEXT_PUBLIC_ENABLE_ANALYTICS=true
-SUPABASE_ANALYTICS_TABLE=portfolio_events
-ANALYTICS_MAX_ROWS=5000
-```
-
-No extra environment variable is required for URL-based media in V1.2.0.
-
-## Supabase setup
-
-Run the full SQL file before using Save live or Analytics:
+Root Gate không còn mở chỉ bằng Forest Rune. Người chơi phải thu đủ:
 
 ```text
-supabase/schema.sql
+Moon Seal   – nằm ở khu Mossy Rock Block
+Thorn Seal  – nằm ở khu Fallen Tree
+Forest Rune – nằm ở Ancient Ruins
 ```
 
-This creates:
+Sau khi đủ 3 dấu ấn, Root Gate mới mở.
 
-- `portfolio_profiles`
-- `portfolio_events`
+### 2. Mossy Rock Block khó hơn
 
-## Local development
+Khu đá chắn đường đã được chỉnh lại thành bài toán quan sát đường cao:
 
-```bash
-npm install
+```text
+Không chạy thẳng được
+→ tìm bệ thấp
+→ nhảy lên bệ giữa
+→ lên seal ledge
+→ lấy Moon Seal
+→ vượt đá
+```
+
+### 3. Fallen Tree có timing hơn
+
+Khu cây đổ cần Jump + Dash hợp lý để lấy Thorn Seal. Nếu bỏ qua, người chơi vẫn sẽ bị chặn ở Root Gate và phải quay lại tìm seal còn thiếu.
+
+### 4. Ancient Root Gate có điều kiện rõ hơn
+
+Root Gate hiện kiểm tra đủ 3 điều kiện:
+
+```text
+Moon Seal collected
++ Thorn Seal collected
++ Forest Rune collected
+= Gate opened
+```
+
+Nếu chưa đủ, game sẽ nhắc seal còn thiếu.
+
+### 5. UI Puzzle HUD
+
+Thêm HUD trạng thái puzzle:
+
+```text
+PUZZLE SEALS 0/3 • □ Moon  □ Thorn  □ Forest
+```
+
+HUD sẽ cập nhật khi người chơi lấy từng dấu ấn.
+
+### 6. Difficulty Tuning
+
+Đã tinh chỉnh:
+
+- Giảm nhẹ reward coin/heal để run không quá dễ.
+- Area Root Gate Trial chỉ clear khi giải xong puzzle.
+- Checkpoint Root Gate chỉ kích hoạt sau khi cổng đã mở.
+- Boss chỉ kích hoạt sau khi Root Gate đã mở.
+- Đòn chém KAI kiểm tra tầng combat chặt hơn, giảm lỗi chém xuyên xuống dưới.
+
+## Vẫn giữ nguyên
+
+- Roguelite Run System
+- Relic System
+- KAI / Enemy / Boss sprite pipeline
+- Environment & VFX Polish
+- PC skill dock
+- Mobile joystick + MOBA button
+- Run Summary
+- Retry / New Run
+
+## Cách chạy
+
+```powershell
 npm run dev
 ```
 
-Open:
+Mở:
 
 ```text
-http://localhost:3000
+http://localhost:5173
 ```
 
-Admin:
+Nếu port bị chiếm:
+
+```powershell
+$env:PORT=5174; npm run dev
+```
+
+## Phiên bản tiếp theo
 
 ```text
-http://localhost:3000/admin
+V0.6.2 – World 1 Puzzle UX & Hint Polish
 ```
 
-Local fallback admin password:
-
-```text
-huyvo-admin
-```
-
-## Build
-
-```bash
-npm run build
-```
-
-## Vercel deploy note
-
-Keep Vercel Output Directory as the default. Do not set it to `out`.
+Bản tiếp theo nên làm hệ thống hint tốt hơn: chỉ gợi ý khi người chơi kẹt lâu, thêm visual cue, điều chỉnh khoảng nhảy và vị trí platform.
