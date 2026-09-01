@@ -1,81 +1,122 @@
-# RELIC HUNTER V0.4.2 – KAI Official Sprite Integration
+# HuyVo Portfolio — V1.2.0 Media & Project Assets
 
-Bản này nâng cấp từ V0.4.1 và bắt đầu đưa **sprite chính thức đầu tiên của KAI** vào game.
+A professional portfolio/CV web app built with Next.js, TypeScript, Supabase CMS and privacy-conscious analytics.
 
-## Nội dung chính
+## Current version
 
-- Thêm bộ PNG sprite state đầu tiên cho KAI tại `public/assets/characters/kai/`.
-- Game ưu tiên dùng sprite asset thật nếu file tồn tại.
-- Giữ fallback runtime texture nếu asset thiếu hoặc bị đổi tên sai.
-- Tích hợp KAI official sprite vào các state gameplay:
-  - Idle
-  - Run
-  - Jump
-  - Fall
-  - Attack 1
-  - Attack 2
-  - Attack 3
-  - Dash
-  - Crescent Slash / Skill
-  - Hurt
-  - Death
-- Cập nhật `asset-manifest.json` sang V0.4.2.
-- Cập nhật tài liệu `ASSET-PIPELINE.md` và `SPRITE-INTEGRATION.md`.
-- Giữ nguyên toàn bộ gameplay V0.4.1:
-  - Relic System
-  - chọn Relic bằng click/tap hoặc phím 1/2/3
-  - PC skill dock + cooldown trên icon
-  - Mobile joystick + nút MOBA
-  - checkpoint, elite, chest, boss, exit portal
+**V1.2.0 — Media & Project Assets**
 
-## File sprite KAI đã có
+## Main features
 
-```text
-public/assets/characters/kai/
-├── kai-idle.png
-├── kai-run.png
-├── kai-jump.png
-├── kai-fall.png
-├── kai-attack-1.png
-├── kai-attack-2.png
-├── kai-attack-3.png
-├── kai-dash.png
-├── kai-skill.png
-├── kai-hurt.png
-├── kai-death.png
-└── SPRITE-INTEGRATION.md
+- Portfolio landing page
+- Professional CV sections
+- Project portfolio and project case-study detail pages
+- ATS-friendly `/resume`
+- Print / Save PDF resume support
+- Contact page and contact cards
+- SEO, sitemap, robots, manifest, OpenGraph and JSON-LD
+- Supabase-backed Real CMS Admin
+- `/admin` Light / Dark / System theme switcher
+- Visitor analytics dashboard in `/admin`
+- Media & Project Assets management in `/admin`
+- Fallback to `src/data/profile.ts` when Supabase is not configured
+
+## Media & Project Assets
+
+V1.2.0 adds URL-based media management. In `/admin → Media`, you can manage:
+
+- Profile avatar image URL
+- Resume/CV file URL
+- Project icon / initials
+- Project thumbnail image URL
+- Project case-study gallery assets
+- Asset type: Image, Screenshot, Diagram, Document, Video or Link
+- Asset caption and alt text
+
+Media is stored inside the existing `portfolio_profiles.data` JSONB field, so no extra Supabase table is required for this version.
+
+Use public URLs only. For confidential work screenshots, sanitize the image before publishing.
+
+## Analytics events
+
+V1.1.0+ tracks public-site interactions through `/api/analytics` and stores them in Supabase table `portfolio_events`:
+
+- `page_view`
+- `project_view`
+- `cta_click`
+- `resume_download`
+- `contact_click`
+
+Admin pages are not tracked.
+
+## Environment variables
+
+Create these variables on Vercel:
+
+```env
+NEXT_PUBLIC_SITE_URL=https://your-domain.com
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+ADMIN_PASSWORD=your-admin-password
+
+# Optional CMS
+SUPABASE_PORTFOLIO_TABLE=portfolio_profiles
+SUPABASE_PORTFOLIO_ID=default
+PORTFOLIO_REVALIDATE_SECONDS=60
+
+# Optional Analytics
+NEXT_PUBLIC_ENABLE_ANALYTICS=true
+SUPABASE_ANALYTICS_TABLE=portfolio_events
+ANALYTICS_MAX_ROWS=5000
 ```
 
-## Cách chạy
+No extra environment variable is required for URL-based media in V1.2.0.
 
-Giải nén ZIP, mở terminal tại thư mục có `package.json`, chạy:
+## Supabase setup
 
-```powershell
+Run the full SQL file before using Save live or Analytics:
+
+```text
+supabase/schema.sql
+```
+
+This creates:
+
+- `portfolio_profiles`
+- `portfolio_events`
+
+## Local development
+
+```bash
+npm install
 npm run dev
 ```
 
-Mở:
+Open:
 
 ```text
-http://localhost:5173
+http://localhost:3000
 ```
 
-Nếu port bị chiếm:
-
-```powershell
-$env:PORT=5174; npm run dev
-```
-
-## Ghi chú
-
-Sprite trong V0.4.2 là **official sprite integration bước đầu** theo phong cách KAI đã chốt: tóc tối màu, khăn teal, áo sáng, chi tiết đồng, Relic Blade cyan.
-
-Bản sau có thể nâng từ static state sprite sang spritesheet frame-by-frame hoặc Spine animation.
-
-## Phiên bản tiếp theo
+Admin:
 
 ```text
-V0.4.3 – Enemy & Boss Official Sprite Integration
+http://localhost:3000/admin
 ```
 
-Bản đó sẽ bắt đầu thay Slime, Elite và Forest Guardian bằng asset chính thức đầu tiên.
+Local fallback admin password:
+
+```text
+huyvo-admin
+```
+
+## Build
+
+```bash
+npm run build
+```
+
+## Vercel deploy note
+
+Keep Vercel Output Directory as the default. Do not set it to `out`.
