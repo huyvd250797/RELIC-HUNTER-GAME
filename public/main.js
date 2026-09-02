@@ -33,7 +33,7 @@ class AdventureScene extends Phaser.Scene{
     this.load.json('assetManifest', './public/assets/asset-manifest.json');
 
     // Official asset slots.
-    // Các file này có thể chưa tồn tại ở V0.6.1; fallback sẽ tự dùng runtime textures.
+    // Các file này có thể chưa tồn tại ở V0.7.1; fallback sẽ tự dùng runtime textures.
     this.officialAssetSlots = {
       kaiIdle: './public/assets/characters/kai/kai-idle.png',
       kaiRun: './public/assets/characters/kai/kai-run.png',
@@ -94,7 +94,7 @@ class AdventureScene extends Phaser.Scene{
   }
   create(){
     this.input.addPointer(4); this.cameras.main.setBackgroundColor(C.bg); this.physics.world.setBounds(0,0,WORLD_W,H);
-    this.createTextures(); this.setupOfficialKaiSprites(); this.setupOfficialEnemyBossSprites(); this.initRunSystem(); this.createWorld(); this.createAmbientPolish(); this.createPlayer(); this.createEnemies(); this.createBoss(); this.createUI(); this.setupInput();
+    this.createTextures(); this.setupOfficialKaiSprites(); this.setupOfficialEnemyBossSprites(); this.initRunSystem(); this.initCloudSave(); this.createWorld(); this.createAmbientPolish(); this.createPlayer(); this.createEnemies(); this.createBoss(); this.createUI(); this.setupInput();
     this.cameras.main.startFollow(this.player,true,0.08,0.08); this.cameras.main.setBounds(0,0,WORLD_W,H); this.cameras.main.setDeadzone(240,110);
     this.physics.add.collider(this.player,this.ground);
     if(this.obstacles)this.physics.add.collider(this.player,this.obstacles);
@@ -102,7 +102,7 @@ class AdventureScene extends Phaser.Scene{
     if(this.puzzleTokens&&this.puzzleTokens.length){for(const token of this.puzzleTokens){this.physics.add.overlap(this.player,token.sprite,()=>this.collectPuzzleToken(token),null,this);}}
     for(const e of this.enemies){this.physics.add.collider(e.sprite,this.ground); this.physics.add.overlap(this.player,e.sprite,()=>this.contactDamage(e.sprite,e.damage));}
     this.physics.add.collider(this.boss,this.ground); this.physics.add.overlap(this.player,this.boss,()=>this.contactDamage(this.boss,this.bossPhase===1?11:16));
-    this.time.delayedCall(650,()=>this.flash('WORLD 1 • WHISPERING FOREST',1300));
+    this.time.delayedCall(650,()=>this.flash('WORLD 1 • WHISPERING FOREST',1300)); this.time.delayedCall(1200,()=>this.retryQueuedCloudSaves());
   }
   createTextures(){
     const g=this.add.graphics();
@@ -190,7 +190,7 @@ class AdventureScene extends Phaser.Scene{
     makeKai('kai_skill',{sword:'skill',lean:3,scf:1.55});
     g.fillStyle(C.dark).fillRoundedRect(4,12,44,64,12); g.fillStyle(C.cream).fillCircle(26,18,12); g.fillStyle(0x1d2428).fillCircle(26,14,13); g.fillStyle(C.cyan2).fillTriangle(12,32,42,32,8,58); g.fillStyle(C.bronze).fillRoundedRect(4,31,10,30,4); g.fillStyle(C.cyan).fillRect(39,28,5,42); g.generateTexture('kai',52,80); g.clear();
 
-    // Official-style small HUD portrait for V0.6.1.
+    // Official-style small HUD portrait for V0.7.1.
     g.fillStyle(0x061015,1).fillRoundedRect(0,0,74,74,16);
     g.lineStyle(3,C.cyan,0.75).strokeRoundedRect(3,3,68,68,14);
     g.fillStyle(0x0e3035,1).fillCircle(37,37,29);
@@ -512,6 +512,7 @@ class AdventureScene extends Phaser.Scene{
       this.runStats.timeMs=this.time.now-(this.runStats.startedAt||this.time.now);
       if(victory)this.runStats.bossDefeated=true;
     }
+    this.saveRunRecord(victory);
     this.physics.world.pause();
     this.showRunSummary(victory);
   }
@@ -522,7 +523,7 @@ class AdventureScene extends Phaser.Scene{
     const layer=this.add.container(0,0).setScrollFactor(0).setDepth(430);
     this.summaryLayer=layer;
     layer.add(this.add.rectangle(W/2,H/2,W,H,0x02080a,0.84));
-    layer.add(this.add.rectangle(W/2,H/2,650,500,0x07171b,0.96).setStrokeStyle(3,victory?C.cyan:C.red,0.85));
+    layer.add(this.add.rectangle(W/2,H/2,680,550,0x07171b,0.96).setStrokeStyle(3,victory?C.cyan:C.red,0.85));
     layer.add(this.add.text(W/2,130,victory?'RUN COMPLETE':'RUN FAILED',{
       fontSize:'34px',
       fontStyle:'bold',
@@ -545,7 +546,10 @@ class AdventureScene extends Phaser.Scene{
       ['Best combo',st.bestCombo||0],
       ['Damage dealt',st.damageDealt||0],
       ['Damage taken',st.damageTaken||0],
-      ['Puzzle solved',this.rootGateOpened?`Root Gate • ${this.getPuzzleSealCount()}/3 seals`:`${this.getPuzzleSealCount()}/3 seals`]
+      ['Puzzle solved',this.rootGateOpened?`Root Gate • ${this.getPuzzleSealCount()}/3 seals`:`${this.getPuzzleSealCount()}/3 seals`],
+      ['Save mode',this.cloudSave?.enabled?'Cloudflare D1 + local':'Local storage'],
+      ['Sync status',this.cloudSave?.status||'LOCAL'],
+      ['Retry queue',`${this.cloudSave?.queueCount||0} pending`]
     ];
     rows.forEach((row,i)=>{
       const y=214+i*28;
@@ -559,8 +563,334 @@ class AdventureScene extends Phaser.Scene{
     [btnBg,btnText,btnHit].forEach(o=>this.makeUiButtonHit(o,(pointer)=>this.scene.restart()));
     btnHit.setDepth(999);
     layer.add([btnBg,btnText,btnHit]);
-    layer.add(this.add.text(W/2,656,'PC: nhấn R • Mobile: tap nút NEW RUN / RETRY',{fontSize:'13px',color:'#89a5a4'}).setOrigin(.5));
+    layer.add(this.add.text(W/2,666,'PC: nhấn R • Mobile: tap nút NEW RUN / RETRY',{fontSize:'13px',color:'#89a5a4'}).setOrigin(.5));
     if(this.status)this.status.setVisible(false);
+  }
+
+
+
+  initCloudSave(){
+    const cfg=(window.RELIC_HUNTER_CLOUD||{});
+    const safeStorage={
+      get:(k)=>{try{return localStorage.getItem(k)}catch(e){return null}},
+      set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}},
+      remove:(k)=>{try{localStorage.removeItem(k)}catch(e){}},
+      json:(k,fallback)=>{try{return JSON.parse(localStorage.getItem(k)||JSON.stringify(fallback))}catch(e){return fallback}}
+    };
+    let playerId=safeStorage.get('relic_hunter_player_id');
+    if(!playerId){
+      playerId='RH-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).slice(2,7).toUpperCase();
+      safeStorage.set('relic_hunter_player_id',playerId);
+    }
+    this.saveKeys={
+      runs:'relic_hunter_runs_v1',
+      progress:'relic_hunter_progress_v1',
+      queue:'relic_hunter_sync_queue_v2',
+      synced:'relic_hunter_synced_run_ids_v1',
+      saved:'relic_hunter_saved_run_ids_v1'
+    };
+    this.saveStore=safeStorage;
+    this.cloudSave={
+      enabled:!!cfg.enabled && !!cfg.apiBaseUrl,
+      apiBaseUrl:String(cfg.apiBaseUrl||'').replace(/\/$/,''),
+      playerId,
+      playerName:cfg.playerName||'KAI',
+      status:'SAVE: LOCAL READY',
+      lastSyncedAt:null,
+      lastError:null,
+      pending:0,
+      queueCount:0,
+      retrying:false,
+      lastRetryAt:0,
+      requestTimeoutMs:8500
+    };
+    this.refreshLocalProgressCache();
+    this.refreshSyncQueueMeta();
+    if(this.cloudSave.enabled){
+      this.setCloudSaveStatus(this.getOfflineState()?'SAVE: OFFLINE • QUEUE '+this.cloudSave.queueCount:'SAVE: CLOUD READY');
+      this.time.delayedCall(900,()=>this.retryQueuedCloudSaves('boot'));
+      this.time.addEvent({delay:Number(cfg.retryIntervalMs||12000),loop:true,callback:()=>this.retryQueuedCloudSaves('interval')});
+      if(typeof window!=='undefined'){
+        window.addEventListener('online',()=>this.retryQueuedCloudSaves('online'));
+        window.addEventListener('offline',()=>this.setCloudSaveStatus('SAVE: OFFLINE • LOCAL QUEUE'));
+      }
+    }else{
+      this.setCloudSaveStatus('SAVE: LOCAL ONLY');
+    }
+  }
+
+  refreshLocalProgressCache(){
+    const progress=this.saveStore?.json('relic_hunter_progress_v1',null)||{
+      totalRuns:0,wins:0,totalCoins:0,bossDefeats:0,bestTimeMs:null,mostRelics:0,highestDamageDealt:0,relicsDiscovered:[]
+    };
+    this.localProgress=progress;
+  }
+
+
+  buildRunSavePayload(victory=false){
+    const st=this.runStats||{};
+    const runId=st.runId||('RUN-'+Date.now());
+    const run={
+      id:runId,
+      idempotencyKey:`${this.cloudSave?.playerId||'LOCAL'}:${runId}`,
+      result:victory?'WIN':'LOSE',
+      timeMs:Math.max(0,Math.floor(st.timeMs||0)),
+      kills:st.kills||0,
+      elites:st.elites||0,
+      bossDefeated:!!st.bossDefeated,
+      relics:[...this.relics],
+      relicsCollected:st.relicsCollected||this.relics.length,
+      coinsEarned:st.coinsEarned||0,
+      damageDealt:st.damageDealt||0,
+      damageTaken:st.damageTaken||0,
+      bestCombo:st.bestCombo||0,
+      puzzleSeals:this.getPuzzleSealCount?this.getPuzzleSealCount():0,
+      rootGateOpened:!!this.rootGateOpened,
+      world:'World 1 - Whispering Forest',
+      version:'0.7.1',
+      clientVersion:'0.7.1',
+      createdAt:st.savedAt||new Date().toISOString(),
+      localSavedAt:new Date().toISOString()
+    };
+    st.savedAt=run.createdAt;
+    return {
+      playerId:this.cloudSave?.playerId,
+      playerName:this.cloudSave?.playerName||'KAI',
+      run
+    };
+  }
+
+
+  saveRunRecord(victory=false){
+    const payload=this.buildRunSavePayload(victory);
+    const runId=payload.run.id;
+    if(this.currentRunSaveStarted===runId){
+      this.setCloudSaveStatus(this.cloudSave?.enabled?'SAVE: ALREADY QUEUED':'SAVE: LOCAL SAVED');
+      return;
+    }
+    this.currentRunSaveStarted=runId;
+    this.saveRunLocal(payload);
+    if(this.cloudSave?.enabled){
+      this.syncRunToCloud(payload,{source:'finish-run'});
+    }else{
+      this.setCloudSaveStatus('SAVE: LOCAL ONLY');
+    }
+  }
+
+
+  saveRunLocal(payload){
+    const run=payload.run;
+    const list=this.saveStore.json(this.saveKeys.runs,[]);
+    const existed=list.some(r=>r.id===run.id);
+    const filtered=list.filter(r=>r.id!==run.id);
+    filtered.unshift({...run,syncStatus:this.isRunSynced(run.id)?'cloud_synced':'local_saved'});
+    this.saveStore.set(this.saveKeys.runs,JSON.stringify(filtered.slice(0,75)));
+
+    const savedIds=this.saveStore.json(this.saveKeys.saved,[]);
+    const alreadyCounted=savedIds.includes(run.id)||existed;
+    if(!alreadyCounted){
+      savedIds.unshift(run.id);
+      this.saveStore.set(this.saveKeys.saved,JSON.stringify(savedIds.slice(0,200)));
+      const old=this.saveStore.json(this.saveKeys.progress,{
+        totalRuns:0,wins:0,totalCoins:0,bossDefeats:0,bestTimeMs:null,mostRelics:0,highestDamageDealt:0,relicsDiscovered:[]
+      });
+      const relicSet=new Set([...(old.relicsDiscovered||[]),...(run.relics||[])]);
+      const next={
+        totalRuns:(old.totalRuns||0)+1,
+        wins:(old.wins||0)+(run.result==='WIN'?1:0),
+        totalCoins:(old.totalCoins||0)+(run.coinsEarned||0),
+        bossDefeats:(old.bossDefeats||0)+(run.bossDefeated?1:0),
+        bestTimeMs:run.result==='WIN'?((old.bestTimeMs==null)?run.timeMs:Math.min(old.bestTimeMs,run.timeMs)):old.bestTimeMs,
+        mostRelics:Math.max(old.mostRelics||0,run.relicsCollected||0),
+        highestDamageDealt:Math.max(old.highestDamageDealt||0,run.damageDealt||0),
+        relicsDiscovered:[...relicSet],
+        updatedAt:new Date().toISOString()
+      };
+      this.saveStore.set(this.saveKeys.progress,JSON.stringify(next));
+      this.localProgress=next;
+    }
+  }
+
+
+  async syncRunToCloud(payload,meta={}){
+    if(!this.cloudSave?.enabled)return;
+    const runId=payload?.run?.id;
+    if(!runId)return;
+    if(this.isRunSynced(runId)){
+      this.setCloudSaveStatus('SAVE: CLOUD SYNCED');
+      return;
+    }
+    if(this.getOfflineState()){
+      this.queueRunForRetry(payload,'browser offline');
+      this.setCloudSaveStatus('SAVE: OFFLINE • QUEUE '+this.cloudSave.queueCount);
+      return;
+    }
+    this.cloudSave.pending++;
+    this.setCloudSaveStatus(meta.source==='retry'?'SAVE: RETRYING...':'SAVE: SYNCING...');
+    try{
+      const data=await this.postRunPayload(payload);
+      this.markRunSynced(runId);
+      this.removeRunFromQueue(runId);
+      this.cloudSave.lastSyncedAt=new Date().toISOString();
+      this.cloudSave.lastError=null;
+      this.setCloudSaveStatus(data?.duplicate?'SAVE: CLOUD ALREADY SYNCED':'SAVE: CLOUD SYNCED');
+    }catch(err){
+      const reason=err?.name==='AbortError'?'sync timeout':(err?.message||String(err));
+      this.cloudSave.lastError=reason;
+      this.queueRunForRetry(payload,reason);
+      this.setCloudSaveStatus('SAVE: LOCAL • RETRY QUEUE '+this.cloudSave.queueCount);
+    }finally{
+      this.cloudSave.pending=Math.max(0,this.cloudSave.pending-1);
+    }
+  }
+
+
+  setCloudSaveStatus(text){
+    if(this.cloudSave){
+      this.cloudSave.status=text;
+      this.refreshSyncQueueMeta();
+    }
+    if(this.cloudSaveText){
+      const q=this.cloudSave?.queueCount||0;
+      const suffix=q>0?` • Q${q}`:'';
+      this.cloudSaveText.setText(`${text}${suffix}`);
+      this.cloudSaveText.setColor(text.includes('SYNCED')?'#bfffd8':text.includes('OFFLINE')||text.includes('RETRY')?'#ffe6ad':'#c8fffb');
+    }
+  }
+
+
+  getOfflineState(){return typeof navigator!=='undefined' && navigator.onLine===false}
+
+  getSyncQueue(){return this.saveStore?.json(this.saveKeys.queue,[])||[]}
+
+  saveSyncQueue(queue){
+    const map=new Map();
+    for(const item of queue){
+      if(!item?.runId||!item?.payload?.run)continue;
+      const prev=map.get(item.runId);
+      map.set(item.runId,prev?{...prev,...item,attempts:Math.max(prev.attempts||0,item.attempts||0)}:item);
+    }
+    const next=[...map.values()].slice(0,30);
+    this.saveStore.set(this.saveKeys.queue,JSON.stringify(next));
+    this.refreshSyncQueueMeta(next);
+  }
+
+  refreshSyncQueueMeta(queue=null){
+    if(!this.cloudSave||!this.saveStore||!this.saveKeys)return;
+    const q=queue||this.getSyncQueue();
+    this.cloudSave.queueCount=q.filter(item=>item?.runId&&!this.isRunSynced(item.runId)).length;
+  }
+
+  getRetryDelayMs(attempts=0){
+    return Math.min(5*60*1000,Math.max(5000,5000*Math.pow(2,Math.min(5,attempts||0))));
+  }
+
+  queueRunForRetry(payload,reason='sync failed'){
+    const runId=payload?.run?.id;
+    if(!runId||this.isRunSynced(runId))return;
+    const queue=this.getSyncQueue();
+    const now=Date.now();
+    const existing=queue.find(item=>item.runId===runId);
+    if(existing){
+      existing.payload=payload;
+      existing.attempts=(existing.attempts||0)+1;
+      existing.lastError=reason;
+      existing.updatedAt=new Date().toISOString();
+      existing.nextRetryAt=now+this.getRetryDelayMs(existing.attempts);
+    }else{
+      queue.unshift({
+        runId,
+        payload,
+        attempts:0,
+        queuedAt:new Date().toISOString(),
+        updatedAt:new Date().toISOString(),
+        lastError:reason,
+        nextRetryAt:now+5000
+      });
+    }
+    this.saveSyncQueue(queue);
+  }
+
+  removeRunFromQueue(runId){
+    const queue=this.getSyncQueue().filter(item=>item.runId!==runId);
+    this.saveSyncQueue(queue);
+  }
+
+  isRunSynced(runId){
+    const ids=this.saveStore?.json(this.saveKeys?.synced||'relic_hunter_synced_run_ids_v1',[])||[];
+    return ids.includes(runId);
+  }
+
+  markRunSynced(runId){
+    if(!runId)return;
+    const ids=this.saveStore.json(this.saveKeys.synced,[]).filter(id=>id!==runId);
+    ids.unshift(runId);
+    this.saveStore.set(this.saveKeys.synced,JSON.stringify(ids.slice(0,200)));
+    const list=this.saveStore.json(this.saveKeys.runs,[]).map(r=>r.id===runId?{...r,syncStatus:'cloud_synced',cloudSyncedAt:new Date().toISOString()}:r);
+    this.saveStore.set(this.saveKeys.runs,JSON.stringify(list.slice(0,75)));
+    this.refreshSyncQueueMeta();
+  }
+
+  async postRunPayload(payload){
+    const controller=typeof AbortController!=='undefined'?new AbortController():null;
+    const timer=controller?setTimeout(()=>controller.abort(),this.cloudSave.requestTimeoutMs):null;
+    try{
+      const res=await fetch(`${this.cloudSave.apiBaseUrl}/api/runs`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-RelicHunter-Idempotency-Key':payload.run.idempotencyKey||payload.run.id},
+        body:JSON.stringify(payload),
+        signal:controller?.signal
+      });
+      if(!res.ok)throw new Error(`HTTP ${res.status}`);
+      return await res.json().catch(()=>({ok:true}));
+    }finally{
+      if(timer)clearTimeout(timer);
+    }
+  }
+
+
+  async retryQueuedCloudSaves(source='manual'){
+    if(!this.cloudSave?.enabled||this.cloudSave.retrying)return;
+    let queue=this.getSyncQueue();
+    if(!queue.length){
+      this.refreshSyncQueueMeta();
+      return;
+    }
+    if(this.getOfflineState()){
+      this.setCloudSaveStatus('SAVE: OFFLINE • QUEUE '+queue.length);
+      return;
+    }
+    const now=Date.now();
+    const due=queue.filter(item=>(item.nextRetryAt||0)<=now&&!this.isRunSynced(item.runId));
+    if(!due.length){
+      this.setCloudSaveStatus('SAVE: WAITING RETRY • QUEUE '+queue.length);
+      return;
+    }
+    this.cloudSave.retrying=true;
+    this.cloudSave.lastRetryAt=now;
+    this.setCloudSaveStatus(`SAVE: RETRY ${due.length}/${queue.length}`);
+    const remaining=[];
+    const dueIds=new Set(due.map(item=>item.runId));
+    for(const item of queue){
+      if(!dueIds.has(item.runId)){
+        if(!this.isRunSynced(item.runId))remaining.push(item);
+        continue;
+      }
+      try{
+        await this.syncRunToCloud(item.payload,{source:'retry'});
+      }catch(err){
+        item.attempts=(item.attempts||0)+1;
+        item.lastError=err?.message||String(err);
+        item.nextRetryAt=Date.now()+this.getRetryDelayMs(item.attempts);
+        remaining.push(item);
+      }
+    }
+    queue=this.getSyncQueue();
+    const stillQueued=queue.filter(item=>!this.isRunSynced(item.runId));
+    this.saveSyncQueue(stillQueued.slice(0,30));
+    this.cloudSave.retrying=false;
+    this.refreshSyncQueueMeta();
+    this.setCloudSaveStatus(this.cloudSave.queueCount?'SAVE: LOCAL QUEUE':'SAVE: CLOUD SYNCED');
   }
 
   createWorld(){
@@ -598,7 +928,7 @@ class AdventureScene extends Phaser.Scene{
       if(i%5===0) this.add.circle(x+8,y+8,3,C.cyan,0.22);
     }
     this.add.text(70,105,'WHISPERING FOREST',{fontSize:'22px',fontStyle:'bold',color:'#8ff8f0'});
-    this.add.text(70,133,'World 1 Puzzle Flow Fix & Difficulty Tuning • Puzzle Obstacles',{fontSize:'13px',color:'#8aa9a7'});
+    this.add.text(70,133,'Save Sync Fix & Offline Retry • Puzzle Obstacles',{fontSize:'13px',color:'#8aa9a7'});
     this.checkpoint=this.add.container(1760,590);this.checkpoint.add(this.add.rectangle(0,0,18,95,C.cyan2,0.7));this.checkpoint.add(this.add.circle(0,-52,18,C.cyan,0.8));this.checkpoint.add(this.add.text(0,36,'CHECKPOINT',{fontSize:'12px',color:'#9ff'}).setOrigin(0.5));
     this.tweens.add({targets:this.checkpoint.list[1],scale:1.2,alpha:0.55,yoyo:true,repeat:-1,duration:850});
     this.chest=this.physics.add.staticSprite(2600,FLOOR_TOP-36,'chest');
@@ -606,7 +936,7 @@ class AdventureScene extends Phaser.Scene{
     this.physics.add.overlap(this.player??this.add.zone(-999,-999,1,1),this.chest,()=>{});
   }
   createAmbientPolish(){
-    // V0.6.1 KAI Official Sprite Integration: lightweight runtime atmosphere.
+    // V0.7.1 KAI Official Sprite Integration: lightweight runtime atmosphere.
     this.add.rectangle(WORLD_W/2, 0, WORLD_W, H, 0x031013, 0.16).setOrigin(0.5,0).setScrollFactor(0.12).setDepth(-8);
     for(let i=0;i<34;i++){
       const x=Phaser.Math.Between(120,WORLD_W-120);
@@ -816,7 +1146,7 @@ class AdventureScene extends Phaser.Scene{
     const frontGap=this.facing>0?t.left-p.right:p.left-t.right;
     const verticalOverlap=Math.min(p.bottom,t.bottom)-Math.max(p.top,t.top);
     const centerYGap=Math.abs(p.cy-t.cy);
-    // V0.6.1: stricter combat tier. KAI đứng trên bệ/tường không còn chém xuyên xuống tầng dưới.
+    // V0.7.1: stricter combat tier. KAI đứng trên bệ/tường không còn chém xuyên xuống tầng dưới.
     const footGap=Math.abs(p.bottom-t.bottom);
     const sameCombatLevel=(verticalOverlap>=16 || centerYGap<=verticalGapLimit) && footGap<=46;
     if(!inFront||frontGap>reach||frontGap<-behindAllowance||!sameCombatLevel)return false;
@@ -859,10 +1189,10 @@ class AdventureScene extends Phaser.Scene{
     ui.add(this.add.text(82,27,'KAI',{fontSize:'16px',fontStyle:'bold',color:'#d8fffc'}));
     this.hpBar=this.add.graphics();ui.add(this.hpBar);
     this.objective=this.add.text(28,94,'OBJECTIVE: Solve seal puzzles, clear areas and build Relics',{fontSize:'16px',color:'#d8fffc',backgroundColor:'#061015aa',padding:{x:12,y:8}});ui.add(this.objective);
-    ui.add(this.add.rectangle(386,18,455,82,0x061015,0.70).setOrigin(0));
+    ui.add(this.add.rectangle(386,18,455,108,0x061015,0.70).setOrigin(0));
     this.runText=this.add.text(402,28,'RUN ------ • 00:00',{fontSize:'15px',fontStyle:'bold',color:'#ffe6ad'});ui.add(this.runText);
     this.areaText=this.add.text(402,53,'AREA 1/6 • Forest Entrance',{fontSize:'13px',color:'#8ff8f0'});ui.add(this.areaText);
-    this.puzzleHud=this.add.text(402,76,'PUZZLE SEALS 0/3 • □ Moon  □ Thorn  □ Forest',{fontSize:'12px',fontStyle:'bold',color:'#bffaf5',stroke:'#061015',strokeThickness:3});ui.add(this.puzzleHud);
+    this.puzzleHud=this.add.text(402,76,'PUZZLE SEALS 0/3 • □ Moon  □ Thorn  □ Forest',{fontSize:'12px',fontStyle:'bold',color:'#bffaf5',stroke:'#061015',strokeThickness:3});ui.add(this.puzzleHud);this.cloudSaveText=this.add.text(402,101,(this.cloudSave?.status||'SAVE: LOCAL'),{fontSize:'12px',fontStyle:'bold',color:'#ffe6ad',stroke:'#061015',strokeThickness:3});ui.add(this.cloudSaveText);
     this.relicHud=this.add.container(28,140);
     this.relicHud.add(this.add.rectangle(0,0,390,70,0x061015,0.46).setOrigin(0));
     this.relicHud.add(this.add.text(12,8,'RELIC BUILD',{fontSize:'12px',fontStyle:'bold',color:'#8ff8f0'}));
@@ -1046,7 +1376,7 @@ class AdventureScene extends Phaser.Scene{
   hitBoss(dmg){const dealt=Math.min(dmg,this.bossHP);this.bossHP=Math.max(0,this.bossHP-dmg);if(this.runStats)this.runStats.damageDealt+=dealt;this.boss.setTint(0xffffff);this.cameras.main.shake(55,.003);this.createImpactSpark(this.boss.x,this.boss.y-22,this.bossPhase===2?C.red:C.cyan);this.time.delayedCall(80,()=>{if(this.boss.active){this.bossPhase===2?this.boss.setTint(0xff7777):this.boss.clearTint();if(!this.bossBusy)this.setBossTexture(this.bossPhase===2?'rage':'idle');}});if(this.bossHP<=0){if(this.runStats)this.runStats.bossDefeated=true;this.setBossTexture('death');this.boss.body.enable=false;this.createDeathBurst(this.boss.x,this.boss.y-40,C.red);this.tweens.add({targets:this.boss,alpha:0,scale:0.92,duration:520,onComplete:()=>this.boss.disableBody(true,true)});if(this.hasRelic('blood_pact'))this.healPlayer(30);if(!this.bossRelicDropped){this.bossRelicDropped=true;this.flash('BOSS DEFEATED • ANCIENT RELIC UNLOCKED',1100);this.time.delayedCall(550,()=>this.showRelicChoices('boss'));}else this.openPortalAfterRelic();}}
   contactDamage(enemy,dmg){if(this.time.now<this.invincibleUntil)return;this.takeDamage(dmg);this.player.setVelocityX(Math.sign(this.player.x-enemy.x)*260);this.player.setVelocityY(-180)}
   takeDamage(dmg){if(this.time.now<this.invincibleUntil||this.ended)return;if(this.hasRelic('guardian_shell'))dmg=Math.ceil(dmg*0.78);if(this.runStats)this.runStats.damageTaken+=dmg;this.playerHP=Math.max(0,this.playerHP-dmg);this.invincibleUntil=this.time.now+700;this.hurtUntil=this.time.now+350;this.setKaiTexture(this.kaiTex.hurt);this.player.setTint(0xff7777);this.cameras.main.shake(100,.006);this.showDamageText(this.player.x,this.player.y-54,dmg,0xff6b6b,'-');this.time.delayedCall(150,()=>this.player.clearTint());if(this.playerHP<=0){this.setKaiTexture(this.kaiTex.death);this.flash('KAI FALLEN • RUN FAILED',900);this.time.delayedCall(450,()=>this.finishRun(false));}}
-  drawUI(){this.hpBar.clear().fillStyle(0x183434,.95).fillRoundedRect(118,40,218,18,8).fillStyle(C.green,1).fillRoundedRect(118,40,218*(this.playerHP/100),18,8);this.coinText.setText(`COIN ${this.coins}`);this.bossBar.clear().fillStyle(0x26161a,.95).fillRoundedRect(W/2-280,50,560,16,8).fillStyle(C.red,1).fillRoundedRect(W/2-280,50,560*(this.bossHP/this.bossMaxHP),16,8);this.updateRelicHud();this.updatePuzzleHud&&this.updatePuzzleHud()}
+  drawUI(){this.hpBar.clear().fillStyle(0x183434,.95).fillRoundedRect(118,40,218,18,8).fillStyle(C.green,1).fillRoundedRect(118,40,218*(this.playerHP/100),18,8);this.coinText.setText(`COIN ${this.coins}`);this.bossBar.clear().fillStyle(0x26161a,.95).fillRoundedRect(W/2-280,50,560,16,8).fillStyle(C.red,1).fillRoundedRect(W/2-280,50,560*(this.bossHP/this.bossMaxHP),16,8);this.updateRelicHud();this.updatePuzzleHud&&this.updatePuzzleHud();if(this.cloudSaveText&&this.cloudSave)this.setCloudSaveStatus(this.cloudSave.status||'SAVE: LOCAL')}
   hasRelic(id){return this.relics.includes(id)}
   getDashCooldown(){return this.hasRelic('wind_step')?520:720}
   getSkillCooldown(){return this.hasRelic('relic_surge')?3400:4700}

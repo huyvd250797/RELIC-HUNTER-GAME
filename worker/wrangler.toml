@@ -1,0 +1,13 @@
+name = "relic-hunter-cloud-save"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+account_id="f67f134b8471c9e6101e3b53a0a7597f"
+
+[vars]
+ALLOWED_ORIGIN = "*"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "relic-hunter-db"
+database_id = "0332bcc6-6050-4198-813a-5bfab483713b"
+migrations_dir = "migrations"

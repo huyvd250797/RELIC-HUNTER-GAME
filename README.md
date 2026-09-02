@@ -1,85 +1,47 @@
-# RELIC HUNTER V0.6.1 – World 1 Puzzle Flow Fix & Difficulty Tuning
+# RELIC HUNTER V0.7.1 – Save Sync Fix & Offline Retry
 
-Bản này nâng cấp từ **V0.6.0 – World 1 Content Expansion**.
-
-Trọng tâm: làm cho World 1 bớt chạy thẳng, buộc người chơi phải quan sát, thử đường nhảy, lấy đủ dấu ấn và suy nghĩ trước khi vượt qua Root Gate.
+Bản này nâng cấp từ **V0.7.0 – Cloud Save + Workers + D1** và tập trung sửa/hoàn thiện phần lưu dữ liệu Cloudflare sau khi deploy thật.
 
 ## Nội dung chính
 
-### 1. Puzzle Flow mới: 3 dấu ấn mở Root Gate
+- Chống lưu trùng run ở localStorage.
+- Chống cộng trùng `player_progress` trên Cloudflare D1 khi retry cùng một run.
+- Thêm idempotency key cho mỗi run.
+- Thêm retry queue local `relic_hunter_sync_queue_v2`.
+- Tự retry khi:
+  - mở game lại
+  - trình duyệt online trở lại
+  - mỗi 12 giây nếu còn queue
+- Thêm timeout 8.5s cho request sync để tránh treo.
+- Thêm trạng thái sync rõ hơn trong HUD:
+  - `SAVE: CLOUD READY`
+  - `SAVE: SYNCING...`
+  - `SAVE: CLOUD SYNCED`
+  - `SAVE: LOCAL • RETRY QUEUE`
+  - `SAVE: OFFLINE • QUEUE`
+- Run Summary hiển thị thêm:
+  - Sync status
+  - Retry queue
+- Worker API hỗ trợ duplicate-safe save.
+- Worker API thêm route kiểm tra trạng thái sync:
+  - `GET /api/sync-status?runId=...`
 
-Root Gate không còn mở chỉ bằng Forest Rune. Người chơi phải thu đủ:
+## Cloud config
 
-```text
-Moon Seal   – nằm ở khu Mossy Rock Block
-Thorn Seal  – nằm ở khu Fallen Tree
-Forest Rune – nằm ở Ancient Ruins
+File `public/cloud-save-config.js` đã được cấu hình theo Worker URL Boss đã deploy:
+
+```js
+window.RELIC_HUNTER_CLOUD = {
+  enabled: true,
+  apiBaseUrl: 'https://relic-hunter-cloud-save.huywork257.workers.dev',
+  playerName: 'KAI',
+  retryIntervalMs: 12000
+};
 ```
 
-Sau khi đủ 3 dấu ấn, Root Gate mới mở.
+Nếu đổi Worker URL khác, sửa lại `apiBaseUrl`.
 
-### 2. Mossy Rock Block khó hơn
-
-Khu đá chắn đường đã được chỉnh lại thành bài toán quan sát đường cao:
-
-```text
-Không chạy thẳng được
-→ tìm bệ thấp
-→ nhảy lên bệ giữa
-→ lên seal ledge
-→ lấy Moon Seal
-→ vượt đá
-```
-
-### 3. Fallen Tree có timing hơn
-
-Khu cây đổ cần Jump + Dash hợp lý để lấy Thorn Seal. Nếu bỏ qua, người chơi vẫn sẽ bị chặn ở Root Gate và phải quay lại tìm seal còn thiếu.
-
-### 4. Ancient Root Gate có điều kiện rõ hơn
-
-Root Gate hiện kiểm tra đủ 3 điều kiện:
-
-```text
-Moon Seal collected
-+ Thorn Seal collected
-+ Forest Rune collected
-= Gate opened
-```
-
-Nếu chưa đủ, game sẽ nhắc seal còn thiếu.
-
-### 5. UI Puzzle HUD
-
-Thêm HUD trạng thái puzzle:
-
-```text
-PUZZLE SEALS 0/3 • □ Moon  □ Thorn  □ Forest
-```
-
-HUD sẽ cập nhật khi người chơi lấy từng dấu ấn.
-
-### 6. Difficulty Tuning
-
-Đã tinh chỉnh:
-
-- Giảm nhẹ reward coin/heal để run không quá dễ.
-- Area Root Gate Trial chỉ clear khi giải xong puzzle.
-- Checkpoint Root Gate chỉ kích hoạt sau khi cổng đã mở.
-- Boss chỉ kích hoạt sau khi Root Gate đã mở.
-- Đòn chém KAI kiểm tra tầng combat chặt hơn, giảm lỗi chém xuyên xuống dưới.
-
-## Vẫn giữ nguyên
-
-- Roguelite Run System
-- Relic System
-- KAI / Enemy / Boss sprite pipeline
-- Environment & VFX Polish
-- PC skill dock
-- Mobile joystick + MOBA button
-- Run Summary
-- Retry / New Run
-
-## Cách chạy
+## Cách chạy game local
 
 ```powershell
 npm run dev
@@ -97,10 +59,59 @@ Nếu port bị chiếm:
 $env:PORT=5174; npm run dev
 ```
 
+## Cập nhật Cloudflare Worker
+
+Vào thư mục `worker`:
+
+```powershell
+cd worker
+npm install
+```
+
+Nếu đã có D1 database từ V0.7.0, chạy migration mới:
+
+```powershell
+npx wrangler d1 migrations apply relic-hunter-db --remote
+```
+
+Sau đó deploy Worker:
+
+```powershell
+npx wrangler deploy --config wrangler.toml
+```
+
+Nếu `wrangler.toml` trong máy Boss đã có `database_id` và `account_id`, hãy giữ lại/copy sang file mới trước khi deploy.
+
+## Kiểm tra Worker
+
+```powershell
+curl.exe https://relic-hunter-cloud-save.huywork257.workers.dev/api/health
+```
+
+Kiểm tra bảng:
+
+```powershell
+npx wrangler d1 execute relic-hunter-db --remote --command="SELECT name FROM sqlite_master WHERE type='table';"
+```
+
+Kiểm tra run history:
+
+```powershell
+npx wrangler d1 execute relic-hunter-db --remote --command="SELECT * FROM run_history ORDER BY created_at DESC LIMIT 5;"
+```
+
+Kiểm tra progress không bị cộng trùng:
+
+```powershell
+npx wrangler d1 execute relic-hunter-db --remote --command="SELECT * FROM player_progress;"
+```
+
+## Ghi chú kỹ thuật
+
+V0.7.1 không yêu cầu người chơi đăng nhập. Player ID được tạo cục bộ bằng localStorage. Cloud save hiện dùng public Worker endpoint và D1, không lưu token trong frontend.
+
 ## Phiên bản tiếp theo
 
 ```text
-V0.6.2 – World 1 Puzzle UX & Hint Polish
+V0.8.0 – Quality / Performance / Polish
 ```
-
-Bản tiếp theo nên làm hệ thống hint tốt hơn: chỉ gợi ý khi người chơi kẹt lâu, thêm visual cue, điều chỉnh khoảng nhảy và vị trí platform.
