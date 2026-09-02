@@ -1,7 +1,7 @@
-# RELIC HUNTER V0.8.0 – Cloudflare Setup Notes
+# RELIC HUNTER V0.8.1 – Cloudflare Setup Notes
 
 ## Nếu đã deploy V0.7.1
-V0.8.0 không yêu cầu migration D1 mới. Chỉ cần deploy lại Worker để cập nhật version và header response.
+V0.8.1 không yêu cầu migration D1 mới. Chỉ cần deploy lại Worker để cập nhật version và header response.
 
 ```powershell
 cd worker
@@ -32,7 +32,7 @@ Kết quả nên có:
 {
   "ok": true,
   "service": "relic-hunter-cloud-save",
-  "version": "0.8.0"
+  "version": "0.8.1"
 }
 ```
 
@@ -50,3 +50,8 @@ npx wrangler deploy --dry-run --outdir .wrangler-dry
 ```
 
 Nếu dry-run OK nhưng deploy lỗi, kiểm tra lại account_id, database_id, API token hoặc môi trường Node/Wrangler.
+
+
+## V0.8.1 note
+
+Bản V0.8.1 không yêu cầu migration D1 mới. Chỉ cần deploy lại Worker sau khi giữ nguyên `account_id` và `database_id` thật trong `worker/wrangler.toml`.

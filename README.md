@@ -1,53 +1,69 @@
-# RELIC HUNTER V0.8.0 – Quality / Performance / Polish
+# RELIC HUNTER V0.8.1 – Final Bug Fix Pass
 
-Bản này nâng cấp từ **V0.7.1 – Save Sync Fix & Offline Retry** và tập trung làm game ổn định, mượt và gần release hơn.
+Bản này nâng cấp từ **V0.8.0 – Quality / Performance / Polish** và tập trung rà lỗi cuối trước khi lên **V0.9.0 – Release Content Lock**.
 
-## Nội dung chính
+## Nội dung cập nhật
 
-### 1. Performance polish
+### 1. UI / Click / Tap Reliability
 
-- Thêm FX budget để tránh quá nhiều hiệu ứng tồn tại cùng lúc.
-- Tự bật **LOW FX mode** khi frame time cao hoặc nhiều VFX.
-- Dọn transient VFX khi kết thúc run/restart.
-- Giảm camera shake và particle khi máy yếu/mobile.
-- Throttle update HUD để giảm render text/graphics không cần thiết mỗi frame.
-- Tối ưu một số VFX:
-  - dash trail
-  - hit spark
-  - burn
-  - lightning
-  - root
-  - death burst
-  - ground crack
-  - boss warning
+- Tăng độ ổn định click/tap cho Relic card.
+- Tăng fallback pointer cho PC skill dock.
+- Nút `NEW RUN / RETRY` dùng `safeRestartRun()` để tránh restart khi physics/UI còn treo.
+- Bắt cả `pointerdown` và `pointerup` cho các màn overlay quan trọng.
+- Tắt context menu chuột phải để tránh làm kẹt input trong web game.
 
-### 2. UI / HUD polish
+### 2. Restart Run Stability
 
-- HP bar có viền và đổi màu theo máu.
-- Thêm text HP `current / 100`.
-- Thêm trạng thái performance nhỏ: `QUALITY / LOW FX + FPS`.
-- Cloud Save HUD giảm cập nhật dư thừa.
-- Skill dock PC được polish label.
-- Mobile touch hitbox lớn hơn, dễ tap hơn.
+- Clear transient VFX trước khi restart.
+- Resume physics nếu đang bị pause.
+- Đóng relic overlay/summary overlay trước khi restart.
+- Chặn double restart khi người chơi vừa nhấn R vừa click nút.
 
-### 3. Stability polish
+### 3. Combat Hitbox Final Guard
 
-- Khi restart run, transient FX được clear trước.
-- Save Sync status không bị spam update liên tục.
-- Giữ nguyên retry queue/offline sync của V0.7.1.
-- Worker health trả thêm version/timestamp và header no-store.
+- Siết lại tầng combat của đòn chém KAI.
+- Quái khác tầng không bị mất máu chỉ vì gần theo đường chéo.
+- Boss vẫn có tolerance riêng vì hitbox lớn hơn.
+- Vẫn giữ kiểm tra vật cản giữa KAI và mục tiêu.
 
-## Tính năng vẫn giữ nguyên
+### 4. Cloud Save Edge-case Fix
 
-- World 1 Content Expansion.
-- Puzzle seals: Moon / Thorn / Forest.
-- Root Gate logic.
-- Roguelite Run System.
-- Relic System.
-- Cloud Save + Workers + D1.
-- Offline retry queue.
-- KAI / Enemy / Boss sprite pipeline.
-- Environment & VFX Polish.
+- Thêm guard chống sync cùng một run nhiều lần đồng thời.
+- Retry watchdog kiểm tra queue nếu online lại nhưng event `online` không bắn.
+- Version save payload và Worker health cập nhật lên `0.8.1`.
+- Không yêu cầu migration D1 mới so với V0.8.0/V0.7.1.
+
+### 5. Final Stability Watch
+
+- Tự resume physics nếu không còn ở màn Relic/Run Summary nhưng physics vẫn pause.
+- Clamp actor định kỳ để giảm lỗi rơi khỏi nền.
+- Giữ LOW FX/performance mode từ V0.8.0.
+
+## Cloudflare Worker
+
+Bản này **không cần migration mới**. Nếu đã apply migration `0002_sync_receipts.sql`, chỉ deploy lại Worker:
+
+```powershell
+cd worker
+npm install
+npx wrangler deploy --config wrangler.toml
+```
+
+Test:
+
+```powershell
+curl.exe https://relic-hunter-cloud-save.huywork257.workers.dev/api/health
+```
+
+Kết quả mong muốn có:
+
+```json
+{
+  "ok": true,
+  "service": "relic-hunter-cloud-save",
+  "version": "0.8.1"
+}
+```
 
 ## Cách chạy game local
 
@@ -67,44 +83,10 @@ Nếu port bị chiếm:
 $env:PORT=5174; npm run dev
 ```
 
-## Deploy Worker Cloudflare
-
-Nếu Boss đã deploy V0.7.1 rồi, V0.8.0 không bắt buộc migration mới. Chỉ cần giữ lại `account_id` và `database_id` thật trong `worker/wrangler.toml`, sau đó:
-
-```powershell
-cd worker
-npm install
-npx wrangler deploy --config wrangler.toml
-```
-
-Test Worker:
-
-```powershell
-curl.exe https://relic-hunter-cloud-save.huywork257.workers.dev/api/health
-```
-
-Kết quả mong muốn có version:
-
-```json
-{
-  "ok": true,
-  "service": "relic-hunter-cloud-save",
-  "version": "0.8.0"
-}
-```
-
-## Kiểm tra build
-
-```powershell
-node --check public/main.js
-node --check worker/src/index.js
-node build.js
-```
-
 ## Phiên bản tiếp theo
 
 ```text
-V0.8.1 – Final Bug Fix Pass
+V0.9.0 – Release Content Lock
 ```
 
-Bản tiếp theo nên tập trung test toàn bộ luồng trên PC/mobile, Cloudflare, restart run, puzzle flow, boss fight và save sync.
+Bản kế tiếp sẽ khóa nội dung chính trước khi lên **V1.0.0 – Release Candidate**.

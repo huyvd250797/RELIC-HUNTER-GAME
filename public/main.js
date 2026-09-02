@@ -33,7 +33,7 @@ class AdventureScene extends Phaser.Scene{
     this.load.json('assetManifest', './public/assets/asset-manifest.json');
 
     // Official asset slots.
-    // Các file này có thể chưa tồn tại ở V0.8.0; fallback sẽ tự dùng runtime textures.
+    // Các file này có thể chưa tồn tại ở V0.8.1; fallback sẽ tự dùng runtime textures.
     this.officialAssetSlots = {
       kaiIdle: './public/assets/characters/kai/kai-idle.png',
       kaiRun: './public/assets/characters/kai/kai-run.png',
@@ -94,7 +94,7 @@ class AdventureScene extends Phaser.Scene{
   }
   create(){
     this.input.addPointer(4); this.cameras.main.setBackgroundColor(C.bg); this.physics.world.setBounds(0,0,WORLD_W,H);
-    this.createTextures(); this.setupOfficialKaiSprites(); this.setupOfficialEnemyBossSprites(); this.initRunSystem(); this.initCloudSave(); this.initQualityPolish(); this.createWorld(); this.createAmbientPolish(); this.createPlayer(); this.createEnemies(); this.createBoss(); this.createUI(); this.setupInput();
+    this.createTextures(); this.setupOfficialKaiSprites(); this.setupOfficialEnemyBossSprites(); this.initRunSystem(); this.initCloudSave(); this.initQualityPolish(); this.initFinalBugFixPass(); this.createWorld(); this.createAmbientPolish(); this.createPlayer(); this.createEnemies(); this.createBoss(); this.createUI(); this.setupInput();
     this.cameras.main.startFollow(this.player,true,0.08,0.08); this.cameras.main.setBounds(0,0,WORLD_W,H); this.cameras.main.setDeadzone(240,110);
     this.physics.add.collider(this.player,this.ground);
     if(this.obstacles)this.physics.add.collider(this.player,this.obstacles);
@@ -190,7 +190,7 @@ class AdventureScene extends Phaser.Scene{
     makeKai('kai_skill',{sword:'skill',lean:3,scf:1.55});
     g.fillStyle(C.dark).fillRoundedRect(4,12,44,64,12); g.fillStyle(C.cream).fillCircle(26,18,12); g.fillStyle(0x1d2428).fillCircle(26,14,13); g.fillStyle(C.cyan2).fillTriangle(12,32,42,32,8,58); g.fillStyle(C.bronze).fillRoundedRect(4,31,10,30,4); g.fillStyle(C.cyan).fillRect(39,28,5,42); g.generateTexture('kai',52,80); g.clear();
 
-    // Official-style small HUD portrait for V0.8.0.
+    // Official-style small HUD portrait for V0.8.1.
     g.fillStyle(0x061015,1).fillRoundedRect(0,0,74,74,16);
     g.lineStyle(3,C.cyan,0.75).strokeRoundedRect(3,3,68,68,14);
     g.fillStyle(0x0e3035,1).fillCircle(37,37,29);
@@ -403,7 +403,7 @@ class AdventureScene extends Phaser.Scene{
     this.fxLive = new Set();
     this.lastCombatFxAt = {};
     this.quality = {
-      version: '0.8.0',
+      version: '0.8.1',
       mobile: !!coarse,
       lowFxMode: false,
       maxFx: coarse ? 28 : 46,
@@ -414,6 +414,48 @@ class AdventureScene extends Phaser.Scene{
       slowFrames: 0,
       lastPerfUi: 0
     };
+  }
+
+
+  initFinalBugFixPass(){
+    this.finalBugFixVersion='0.8.1';
+    this._safeRestarting=false;
+    this._lastUiPointerAt=0;
+    this._lastCloudRetryWatchAt=0;
+    if(this.input?.mouse?.disableContextMenu)this.input.mouse.disableContextMenu();
+    this.time.addEvent({
+      delay:1500,
+      loop:true,
+      callback:()=>this.finalStabilityWatch()
+    });
+  }
+
+  finalStabilityWatch(){
+    if(!this.player)return;
+    // V0.8.1: fail-safe. Nếu physics bị pause ngoài màn chọn Relic/Run Summary thì tự resume.
+    if(this.physics?.world?.isPaused&&!this.relicChoiceOpen&&!this.ended){
+      this.physics.world.resume();
+    }
+    this.keepActorsAboveFloor();
+    if(this.cloudSave?.enabled&&this.cloudSave.queueCount>0&&!this.getOfflineState()&&!this.cloudSave.retrying){
+      const now=this.time.now||0;
+      if(now-(this._lastCloudRetryWatchAt||0)>10000){
+        this._lastCloudRetryWatchAt=now;
+        this.retryQueuedCloudSaves('watchdog');
+      }
+    }
+  }
+
+  safeRestartRun(){
+    if(this._safeRestarting)return;
+    this._safeRestarting=true;
+    this.clearTransientFx?.();
+    try{ if(this.physics?.world?.isPaused)this.physics.world.resume(); }catch(e){}
+    if(this.relicLayer){this.relicLayer.destroy();this.relicLayer=null;}
+    if(this.summaryLayer){this.summaryLayer.destroy();this.summaryLayer=null;}
+    this.relicChoiceOpen=false;
+    this.relicChoices=[];
+    this.scene.restart();
   }
 
   updatePerformanceMetrics(time){
@@ -642,7 +684,7 @@ class AdventureScene extends Phaser.Scene{
     const btnBg=this.add.rectangle(W/2,610,210,52,0xf4c76b,1).setStrokeStyle(3,0xffffff,0.25);
     const btnText=this.add.text(W/2,610,'NEW RUN / RETRY',{fontSize:'16px',fontStyle:'bold',color:'#07171b'}).setOrigin(.5);
     const btnHit=this.add.zone(W/2,610,250,82);
-    [btnBg,btnText,btnHit].forEach(o=>this.makeUiButtonHit(o,(pointer)=>this.scene.restart()));
+    [btnBg,btnText,btnHit].forEach(o=>this.makeUiButtonHit(o,(pointer)=>this.safeRestartRun()));
     btnHit.setDepth(999);
     layer.add([btnBg,btnText,btnHit]);
     layer.add(this.add.text(W/2,666,'PC: nhấn R • Mobile: tap nút NEW RUN / RETRY',{fontSize:'13px',color:'#89a5a4'}).setOrigin(.5));
@@ -684,7 +726,8 @@ class AdventureScene extends Phaser.Scene{
       queueCount:0,
       retrying:false,
       lastRetryAt:0,
-      requestTimeoutMs:8500
+      requestTimeoutMs:8500,
+      syncInFlightRunIds:new Set()
     };
     this.refreshLocalProgressCache();
     this.refreshSyncQueueMeta();
@@ -729,8 +772,8 @@ class AdventureScene extends Phaser.Scene{
       puzzleSeals:this.getPuzzleSealCount?this.getPuzzleSealCount():0,
       rootGateOpened:!!this.rootGateOpened,
       world:'World 1 - Whispering Forest',
-      version:'0.8.0',
-      clientVersion:'0.8.0',
+      version:'0.8.1',
+      clientVersion:'0.8.1',
       createdAt:st.savedAt||new Date().toISOString(),
       localSavedAt:new Date().toISOString()
     };
@@ -802,12 +845,17 @@ class AdventureScene extends Phaser.Scene{
       this.setCloudSaveStatus('SAVE: CLOUD SYNCED');
       return;
     }
+    if(this.cloudSave.syncInFlightRunIds?.has(runId)){
+      this.setCloudSaveStatus('SAVE: SYNC ALREADY RUNNING');
+      return;
+    }
     if(this.getOfflineState()){
       this.queueRunForRetry(payload,'browser offline');
       this.setCloudSaveStatus('SAVE: OFFLINE • QUEUE '+this.cloudSave.queueCount);
       return;
     }
     this.cloudSave.pending++;
+    this.cloudSave.syncInFlightRunIds?.add(runId);
     this.setCloudSaveStatus(meta.source==='retry'?'SAVE: RETRYING...':'SAVE: SYNCING...');
     try{
       const data=await this.postRunPayload(payload);
@@ -823,6 +871,7 @@ class AdventureScene extends Phaser.Scene{
       this.setCloudSaveStatus('SAVE: LOCAL • RETRY QUEUE '+this.cloudSave.queueCount);
     }finally{
       this.cloudSave.pending=Math.max(0,this.cloudSave.pending-1);
+      this.cloudSave.syncInFlightRunIds?.delete(runId);
     }
   }
 
@@ -1019,7 +1068,7 @@ class AdventureScene extends Phaser.Scene{
     this.physics.add.overlap(this.player??this.add.zone(-999,-999,1,1),this.chest,()=>{});
   }
   createAmbientPolish(){
-    // V0.8.0 KAI Official Sprite Integration: lightweight runtime atmosphere.
+    // V0.8.1 KAI Official Sprite Integration: lightweight runtime atmosphere.
     this.add.rectangle(WORLD_W/2, 0, WORLD_W, H, 0x031013, 0.16).setOrigin(0.5,0).setScrollFactor(0.12).setDepth(-8);
     for(let i=0;i<34;i++){
       const x=Phaser.Math.Between(120,WORLD_W-120);
@@ -1201,7 +1250,7 @@ class AdventureScene extends Phaser.Scene{
   spawnEnemy(x,type='slime'){const elite=type==='elite';const y=elite?FLOOR_TOP-54:FLOOR_TOP-30;const tex=elite?this.enemyTex.elite.idle:this.enemyTex.slime.idle;const s=this.physics.add.sprite(x,y,tex).setCollideWorldBounds(true).setDragX(900).setBounce(0.02).setDepth(10);s.body.setSize(elite?76:58,elite?78:38).setOffset(elite?26:19,elite?38:23);const hp=elite?155:60;const e={id:++this.enemyId,sprite:s,type,hp,maxHp:hp,damage:elite?11:6,speed:elite?78:62,active:true,floorY:y,state:'idle',areaId:this.getAreaIndexByX(x)};this.enemies.push(e);return e}
   createEnemies(){[620,1040,1280,1980,2240,2570,3150,3890,4140].forEach(x=>this.spawnEnemy(x));this.miniBoss=this.spawnEnemy(2850,'elite');this.spawnEnemy(4050,'elite')}
   createBoss(){this.boss=this.physics.add.sprite(4720,FLOOR_TOP-76,this.bossTex.idle).setVisible(false).setActive(false).setCollideWorldBounds(true).setDepth(12);this.boss.body.setSize(96,104).setOffset(20,18);this.boss.body.enable=false}
-  setupInput(){if(this.input.setTopOnly)this.input.setTopOnly(false);else this.input.topOnly=false;if(this.input.keyboard)this.keys={left:this.input.keyboard.addKey('A'),right:this.input.keyboard.addKey('D'),left2:this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT),right2:this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT),jump:this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),attack:this.input.keyboard.addKey('J'),dash:this.input.keyboard.addKey('K'),skill:this.input.keyboard.addKey('L'),restart:this.input.keyboard.addKey('R'),choice1:this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE),choice2:this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO),choice3:this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.THREE)};this.input.on('pointerdown',p=>this.handlePointerButtonFallback(p));}
+  setupInput(){if(this.input.setTopOnly)this.input.setTopOnly(false);else this.input.topOnly=false;if(this.input.keyboard)this.keys={left:this.input.keyboard.addKey('A'),right:this.input.keyboard.addKey('D'),left2:this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT),right2:this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT),jump:this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),attack:this.input.keyboard.addKey('J'),dash:this.input.keyboard.addKey('K'),skill:this.input.keyboard.addKey('L'),restart:this.input.keyboard.addKey('R'),choice1:this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE),choice2:this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO),choice3:this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.THREE)};this.input.on('pointerdown',p=>this.handlePointerButtonFallback(p,'down'));this.input.on('pointerup',p=>this.handlePointerButtonFallback(p,'up'));}
 
   stopUiEvent(event){if(event&&event.stopPropagation)event.stopPropagation();}
 
@@ -1213,7 +1262,11 @@ class AdventureScene extends Phaser.Scene{
 
   makeUiButtonHit(target,onPick){
     target.setInteractive({useHandCursor:true});
-    target.on('pointerdown',(pointer,localX,localY,event)=>{this.stopUiEvent(event);onPick(pointer);});
+    target.on('pointerdown',(pointer,localX,localY,event)=>{
+      this.stopUiEvent(event);
+      this._lastUiPointerAt=this.time?.now||Date.now();
+      onPick(pointer);
+    });
     target.on('pointerup',(pointer,localX,localY,event)=>this.stopUiEvent(event));
     target.on('pointerupoutside',(pointer,localX,localY,event)=>this.stopUiEvent(event));
     return target;
@@ -1225,13 +1278,16 @@ class AdventureScene extends Phaser.Scene{
     const pb=this.player.body,tb=target.body;
     const p={left:pb.x,right:pb.x+pb.width,top:pb.y,bottom:pb.y+pb.height,cx:pb.x+pb.width/2,cy:pb.y+pb.height/2};
     const t={left:tb.x,right:tb.x+tb.width,top:tb.y,bottom:tb.y+tb.height,cx:tb.x+tb.width/2,cy:tb.y+tb.height/2};
+    const isBossTarget=target===this.boss;
     const inFront=this.facing>0?t.cx>=p.cx-4:t.cx<=p.cx+4;
     const frontGap=this.facing>0?t.left-p.right:p.left-t.right;
     const verticalOverlap=Math.min(p.bottom,t.bottom)-Math.max(p.top,t.top);
     const centerYGap=Math.abs(p.cy-t.cy);
-    // V0.8.0: stricter combat tier. KAI đứng trên bệ/tường không còn chém xuyên xuống tầng dưới.
+    // V0.8.1: final combat-tier guard. Quái khác tầng không nhận damage dù nằm gần theo đường chéo.
     const footGap=Math.abs(p.bottom-t.bottom);
-    const sameCombatLevel=(verticalOverlap>=16 || centerYGap<=verticalGapLimit) && footGap<=46;
+    const maxFootGap=isBossTarget?72:34;
+    const minVerticalOverlap=isBossTarget?12:20;
+    const sameCombatLevel=(verticalOverlap>=minVerticalOverlap || centerYGap<=verticalGapLimit) && footGap<=maxFootGap;
     if(!inFront||frontGap>reach||frontGap<-behindAllowance||!sameCombatLevel)return false;
     return !this.isObstacleBetween(p,t);
   }
@@ -1247,20 +1303,35 @@ class AdventureScene extends Phaser.Scene{
     });
   }
 
-  handlePointerButtonFallback(pointer){
+  handlePointerButtonFallback(pointer,phase='down'){
     if(!pointer)return;
+    const px=pointer.x, py=pointer.y;
     // Robust PC/touch fallback in case Phaser zone ordering misses the click.
+    // V0.8.1: overlay actions listen on pointerdown + pointerup; gameplay buttons fire on down only.
     if(this.relicChoiceOpen&&this.relicChoices&&this.relicChoices.length){
       const sx=W/2-315;
       for(let i=0;i<this.relicChoices.length;i++){
         const x=sx+i*315,y=345;
-        if(pointer.x>=x-150&&pointer.x<=x+150&&pointer.y>=y-165&&pointer.y<=y+165){const c=this.relicChoices[i];this.selectRelic(c.id,c.source);return;}
+        if(px>=x-155&&px<=x+155&&py>=y-172&&py<=y+172){
+          const c=this.relicChoices[i];
+          this.selectRelic(c.id,c.source);
+          return;
+        }
       }
     }
-    if(this.ended&&pointer.x>=W/2-140&&pointer.x<=W/2+140&&pointer.y>=560&&pointer.y<=655){this.scene.restart();return;}
+    if(this.ended&&px>=W/2-150&&px<=W/2+150&&py>=550&&py<=660){
+      this.safeRestartRun();
+      return;
+    }
+    if(phase!=='down')return;
     if(!this.isMobileUI&&!this.relicChoiceOpen&&!this.ended){
-      const map=[{field:'jump',x:W/2-126,y:H-52,r:50},{field:'dash',x:W/2-42,y:H-52,r:52},{field:'skill',x:W/2+44,y:H-52,r:54},{field:'attack',x:W/2+132,y:H-52,r:58}];
-      for(const b of map){if(Math.hypot(pointer.x-b.x,pointer.y-b.y)<=b.r){this.pressVirtualAction(b.field);return;}}
+      const map=[{field:'jump',x:W/2-126,y:H-52,r:54},{field:'dash',x:W/2-42,y:H-52,r:56},{field:'skill',x:W/2+44,y:H-52,r:58},{field:'attack',x:W/2+132,y:H-52,r:62}];
+      for(const b of map){
+        if(Math.hypot(px-b.x,py-b.y)<=b.r){
+          this.pressVirtualAction(b.field);
+          return;
+        }
+      }
     }
   }
 
@@ -1400,7 +1471,7 @@ class AdventureScene extends Phaser.Scene{
     this.updateEnvironmentPolish(time);
     this.updatePerformanceMetrics(time);
     if(this.ended){
-      if(this.keys&&Phaser.Input.Keyboard.JustDown(this.keys.restart)){this.clearTransientFx();this.scene.restart();}
+      if(this.keys&&Phaser.Input.Keyboard.JustDown(this.keys.restart)){this.safeRestartRun();}
       this.updateControlCooldowns(time);
       this.drawUIOptimized(time,true);
       return;

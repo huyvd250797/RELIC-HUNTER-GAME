@@ -1,4 +1,4 @@
-const API_VERSION = '0.8.0';
+const API_VERSION = '0.8.1';
 
 const json = (data, status = 200, cors = {}) =>
   new Response(JSON.stringify(data), {
@@ -123,7 +123,7 @@ async function handleSaveRun(request, env, cors) {
       playerId,
       result,
       cleanText(run.world, 'World 1 - Whispering Forest'),
-      cleanText(run.version, '0.8.0'),
+      cleanText(run.version, '0.8.1'),
       asInt(run.timeMs),
       asInt(run.kills),
       asInt(run.elites),

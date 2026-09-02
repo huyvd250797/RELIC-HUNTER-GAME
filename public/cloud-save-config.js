@@ -1,4 +1,4 @@
-// RELIC HUNTER V0.7.1 – Save Sync Fix & Offline Retry Config
+// RELIC HUNTER V0.8.1 – Final Bug Fix Pass Config
 // Đã cấu hình theo Worker URL Boss deploy thành công.
 // Không chứa token/bí mật; đây chỉ là public API endpoint.
 window.RELIC_HUNTER_CLOUD = {
