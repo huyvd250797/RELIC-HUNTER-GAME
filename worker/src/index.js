@@ -1,8 +1,12 @@
+const API_VERSION = '0.8.0';
+
 const json = (data, status = 200, cors = {}) =>
   new Response(JSON.stringify(data), {
     status,
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'X-Relic-Hunter-Version': API_VERSION,
       ...cors
     }
   });
@@ -119,7 +123,7 @@ async function handleSaveRun(request, env, cors) {
       playerId,
       result,
       cleanText(run.world, 'World 1 - Whispering Forest'),
-      cleanText(run.version, '0.7.1'),
+      cleanText(run.version, '0.8.0'),
       asInt(run.timeMs),
       asInt(run.kills),
       asInt(run.elites),
@@ -136,7 +140,7 @@ async function handleSaveRun(request, env, cors) {
     )
   ]);
 
-  // V0.7.1 receipt is optional-safe. If migration 0002 has not been applied yet,
+  // V0.8.0 receipt is optional-safe. If migration 0002 has not been applied yet,
   // the save still succeeds and the client will still mark the run as synced.
   let receiptSaved = false;
   try {
@@ -163,7 +167,7 @@ async function handleSaveRun(request, env, cors) {
   return json({
     ok: true,
     mode: 'cloud',
-    version: '0.7.1',
+    version: API_VERSION,
     duplicate,
     idempotent: true,
     receiptSaved,
@@ -212,7 +216,7 @@ export default {
 
     try {
       if (url.pathname === '/api/health') {
-        return json({ ok: true, service: 'relic-hunter-cloud-save', version: '0.7.1' }, 200, cors);
+        return json({ ok: true, service: 'relic-hunter-cloud-save', version: API_VERSION, timestamp: new Date().toISOString() }, 200, cors);
       }
       if (url.pathname === '/api/runs' && request.method === 'POST') return handleSaveRun(request, env, cors);
       if (url.pathname === '/api/progress' && request.method === 'GET') return handleGetProgress(url, env, cors);

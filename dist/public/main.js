@@ -26,14 +26,14 @@ const RUN_AREAS=[
 class AdventureScene extends Phaser.Scene{
   inputState={jump:false,attack:false,dash:false,skill:false}; joystickX=0; facing=1; canDash=true; dashReadyAt=0; isDashing=false; invincibleUntil=0; canAttack=true; attackReadyAt=0; attackStep=0; comboExpire=0; skillReadyAt=0; playerHP=100; ended=false; isMobileUI=false; controlWidgets=[]; pcSkillSlots=[]; mobileSkillSlots=[]; relics=[]; relicChoiceOpen=false; relicRewardQueue=[]; eliteRelicDropped=false; bossRelicDropped=false; relicHudItems=[]; burnTimers={}; boundUntil={}; bossSlowUntil=0;
   coins=0; checkpointX=120; chestOpened=false; portalUnlocked=false; bossActive=false; bossMaxHP=840; bossHP=840; bossPhase=1; bossBusy=false; bossNextAttack=0;
-  enemies=[]; enemyId=0; miniBoss=null; forestRuneCollected=false; moonSealCollected=false; thornSealCollected=false; rootGateOpened=false; puzzleObstacles=[]; worldPuzzles=[]; puzzleTokens=[]; puzzleHud=null; puzzleGoalText=null; puzzleDecisionHint=null;
+  enemies=[]; enemyId=0; miniBoss=null; forestRuneCollected=false; moonSealCollected=false; thornSealCollected=false; rootGateOpened=false; puzzleObstacles=[]; worldPuzzles=[]; puzzleTokens=[]; puzzleHud=null; puzzleGoalText=null; puzzleDecisionHint=null; quality=null; fxLive=null; perfText=null; hpText=null; lastCombatFxAt={};
   constructor(){super('adventure')}
   preload() {
     this.load.image('kaiConcept', './public/assets/reference/kai-concept.png');
     this.load.json('assetManifest', './public/assets/asset-manifest.json');
 
     // Official asset slots.
-    // Các file này có thể chưa tồn tại ở V0.7.1; fallback sẽ tự dùng runtime textures.
+    // Các file này có thể chưa tồn tại ở V0.8.0; fallback sẽ tự dùng runtime textures.
     this.officialAssetSlots = {
       kaiIdle: './public/assets/characters/kai/kai-idle.png',
       kaiRun: './public/assets/characters/kai/kai-run.png',
@@ -94,7 +94,7 @@ class AdventureScene extends Phaser.Scene{
   }
   create(){
     this.input.addPointer(4); this.cameras.main.setBackgroundColor(C.bg); this.physics.world.setBounds(0,0,WORLD_W,H);
-    this.createTextures(); this.setupOfficialKaiSprites(); this.setupOfficialEnemyBossSprites(); this.initRunSystem(); this.initCloudSave(); this.createWorld(); this.createAmbientPolish(); this.createPlayer(); this.createEnemies(); this.createBoss(); this.createUI(); this.setupInput();
+    this.createTextures(); this.setupOfficialKaiSprites(); this.setupOfficialEnemyBossSprites(); this.initRunSystem(); this.initCloudSave(); this.initQualityPolish(); this.createWorld(); this.createAmbientPolish(); this.createPlayer(); this.createEnemies(); this.createBoss(); this.createUI(); this.setupInput();
     this.cameras.main.startFollow(this.player,true,0.08,0.08); this.cameras.main.setBounds(0,0,WORLD_W,H); this.cameras.main.setDeadzone(240,110);
     this.physics.add.collider(this.player,this.ground);
     if(this.obstacles)this.physics.add.collider(this.player,this.obstacles);
@@ -190,7 +190,7 @@ class AdventureScene extends Phaser.Scene{
     makeKai('kai_skill',{sword:'skill',lean:3,scf:1.55});
     g.fillStyle(C.dark).fillRoundedRect(4,12,44,64,12); g.fillStyle(C.cream).fillCircle(26,18,12); g.fillStyle(0x1d2428).fillCircle(26,14,13); g.fillStyle(C.cyan2).fillTriangle(12,32,42,32,8,58); g.fillStyle(C.bronze).fillRoundedRect(4,31,10,30,4); g.fillStyle(C.cyan).fillRect(39,28,5,42); g.generateTexture('kai',52,80); g.clear();
 
-    // Official-style small HUD portrait for V0.7.1.
+    // Official-style small HUD portrait for V0.8.0.
     g.fillStyle(0x061015,1).fillRoundedRect(0,0,74,74,16);
     g.lineStyle(3,C.cyan,0.75).strokeRoundedRect(3,3,68,68,14);
     g.fillStyle(0x0e3035,1).fillCircle(37,37,29);
@@ -372,29 +372,110 @@ class AdventureScene extends Phaser.Scene{
   }
 
   createGroundCrack(x,y){
+    if(!this.canSpawnFx('groundCrack',140))return null;
     if(this.textures.exists('vfxGroundCrack')){
-      const crack=this.add.image(x,y,'vfxGroundCrack').setDepth(18).setAlpha(0.9).setScale(0.65+this.bossPhase*0.15);
-      this.tweens.add({targets:crack,alpha:0,scaleX:1.25,scaleY:0.85,duration:700,onComplete:()=>crack.destroy()});
+      const crack=this.trackFx(this.add.image(x,y,'vfxGroundCrack').setDepth(18).setAlpha(0.86).setScale(0.62+this.bossPhase*0.14),820);
+      this.tweens.add({targets:crack,alpha:0,scaleX:1.18,scaleY:0.82,duration:650,onComplete:()=>crack.destroy()});
       return crack;
     }
-    const g=this.add.graphics({x,y}).setDepth(18);
+    const g=this.trackFx(this.add.graphics({x,y}).setDepth(18),780);
     g.lineStyle(5,C.red,0.8);g.beginPath();g.moveTo(-130,0);g.lineTo(-45,-12);g.lineTo(0,8);g.lineTo(55,-6);g.lineTo(135,4);g.strokePath();
-    this.tweens.add({targets:g,alpha:0,duration:620,onComplete:()=>g.destroy()});
+    this.tweens.add({targets:g,alpha:0,duration:580,onComplete:()=>g.destroy()});
     return g;
   }
 
   createBossWarning(x,y,w,h,type='line'){
     let obj;
     if(this.textures.exists('vfxBossWarning')){
-      obj=this.add.image(x,y,'vfxBossWarning').setDepth(17).setAlpha(0.55);
+      obj=this.trackFx(this.add.image(x,y,'vfxBossWarning').setDepth(17).setAlpha(0.52),720);
       obj.setDisplaySize(w,h);
     }else{
-      obj=this.add.rectangle(x,y,w,h,C.warning,.25).setDepth(17);
+      obj=this.trackFx(this.add.rectangle(x,y,w,h,C.warning,.24).setDepth(17),720);
     }
-    this.tweens.add({targets:obj,alpha:0.9,yoyo:true,repeat:2,duration:120});
+    this.tweens.add({targets:obj,alpha:0.88,yoyo:true,repeat:2,duration:110});
     return obj;
   }
 
+
+
+  initQualityPolish(){
+    const coarse = typeof window !== 'undefined' && (window.matchMedia?.('(pointer: coarse)').matches || window.innerWidth < 900);
+    this.fxLive = new Set();
+    this.lastCombatFxAt = {};
+    this.quality = {
+      version: '0.8.0',
+      mobile: !!coarse,
+      lowFxMode: false,
+      maxFx: coarse ? 28 : 46,
+      uiDrawInterval: coarse ? 82 : 48,
+      lastUiDraw: 0,
+      lastFrameAt: 0,
+      frameMsAvg: 16.7,
+      slowFrames: 0,
+      lastPerfUi: 0
+    };
+  }
+
+  updatePerformanceMetrics(time){
+    if(!this.quality)return;
+    if(this.quality.lastFrameAt){
+      const dt=Math.max(1,Math.min(120,time-this.quality.lastFrameAt));
+      this.quality.frameMsAvg=this.quality.frameMsAvg*0.94+dt*0.06;
+      if(dt>34)this.quality.slowFrames++;else this.quality.slowFrames=Math.max(0,this.quality.slowFrames-1);
+      this.quality.lowFxMode=this.quality.slowFrames>18||this.fxLive.size>this.quality.maxFx;
+    }
+    this.quality.lastFrameAt=time;
+    if(this.perfText&&time-(this.quality.lastPerfUi||0)>650){
+      this.quality.lastPerfUi=time;
+      const fps=Math.round(1000/Math.max(12,this.quality.frameMsAvg));
+      const q=this.quality.lowFxMode?'LOW FX':'QUALITY';
+      this.perfText.setText(`${q} • ${fps} FPS`);
+      this.perfText.setColor(this.quality.lowFxMode?'#ffe6ad':'#8ff8f0');
+    }
+  }
+
+  canSpawnFx(kind='fx', gapMs=0){
+    if(!this.quality)return true;
+    const now=this.time?.now||0;
+    if(gapMs>0&&this.lastCombatFxAt[kind]&&now-this.lastCombatFxAt[kind]<gapMs)return false;
+    this.lastCombatFxAt[kind]=now;
+    return this.fxLive.size < (this.quality.lowFxMode?Math.floor(this.quality.maxFx*0.62):this.quality.maxFx);
+  }
+
+  trackFx(obj, ttl=900){
+    if(!obj)return obj;
+    if(!this.fxLive)this.fxLive=new Set();
+    this.fxLive.add(obj);
+    if(obj.once)obj.once('destroy',()=>this.fxLive&&this.fxLive.delete(obj));
+    if(ttl>0&&this.time)this.time.delayedCall(ttl,()=>{
+      if(obj&&obj.active!==false&&obj.destroy){
+        try{obj.destroy();}catch(e){}
+      }
+      if(this.fxLive)this.fxLive.delete(obj);
+    });
+    return obj;
+  }
+
+  clearTransientFx(){
+    if(!this.fxLive)return;
+    for(const obj of [...this.fxLive]){
+      if(obj&&obj.destroy){try{obj.destroy();}catch(e){}}
+    }
+    this.fxLive.clear();
+  }
+
+  polishShake(duration=80,intensity=0.003){
+    const low=this.quality?.lowFxMode;
+    this.cameras.main.shake(low?Math.max(30,Math.floor(duration*0.55)):duration,low?intensity*0.6:intensity);
+  }
+
+  drawUIOptimized(time,force=false){
+    if(!this.quality){this.drawUI();return;}
+    if(force||time-(this.quality.lastUiDraw||0)>=this.quality.uiDrawInterval||this.ended||this.relicChoiceOpen){
+      this.quality.lastUiDraw=time;
+      this.drawUI();
+    }
+  }
 
   initRunSystem(){
     this.runAreas=RUN_AREAS.map(a=>({...a,cleared:false,entered:false}));
@@ -513,6 +594,7 @@ class AdventureScene extends Phaser.Scene{
       if(victory)this.runStats.bossDefeated=true;
     }
     this.saveRunRecord(victory);
+    this.clearTransientFx();
     this.physics.world.pause();
     this.showRunSummary(victory);
   }
@@ -647,8 +729,8 @@ class AdventureScene extends Phaser.Scene{
       puzzleSeals:this.getPuzzleSealCount?this.getPuzzleSealCount():0,
       rootGateOpened:!!this.rootGateOpened,
       world:'World 1 - Whispering Forest',
-      version:'0.7.1',
-      clientVersion:'0.7.1',
+      version:'0.8.0',
+      clientVersion:'0.8.0',
       createdAt:st.savedAt||new Date().toISOString(),
       localSavedAt:new Date().toISOString()
     };
@@ -753,8 +835,9 @@ class AdventureScene extends Phaser.Scene{
     if(this.cloudSaveText){
       const q=this.cloudSave?.queueCount||0;
       const suffix=q>0?` • Q${q}`:'';
-      this.cloudSaveText.setText(`${text}${suffix}`);
-      this.cloudSaveText.setColor(text.includes('SYNCED')?'#bfffd8':text.includes('OFFLINE')||text.includes('RETRY')?'#ffe6ad':'#c8fffb');
+      const finalText=`${text}${suffix}`;
+      if(this.cloudSaveText.text!==finalText)this.cloudSaveText.setText(finalText);
+      this.cloudSaveText.setColor(text.includes('SYNCED')?'#bfffd8':text.includes('FAILED')?'#ffb0b0':text.includes('OFFLINE')||text.includes('RETRY')||text.includes('WAITING')?'#ffe6ad':'#c8fffb');
     }
   }
 
@@ -936,7 +1019,7 @@ class AdventureScene extends Phaser.Scene{
     this.physics.add.overlap(this.player??this.add.zone(-999,-999,1,1),this.chest,()=>{});
   }
   createAmbientPolish(){
-    // V0.7.1 KAI Official Sprite Integration: lightweight runtime atmosphere.
+    // V0.8.0 KAI Official Sprite Integration: lightweight runtime atmosphere.
     this.add.rectangle(WORLD_W/2, 0, WORLD_W, H, 0x031013, 0.16).setOrigin(0.5,0).setScrollFactor(0.12).setDepth(-8);
     for(let i=0;i<34;i++){
       const x=Phaser.Math.Between(120,WORLD_W-120);
@@ -1146,7 +1229,7 @@ class AdventureScene extends Phaser.Scene{
     const frontGap=this.facing>0?t.left-p.right:p.left-t.right;
     const verticalOverlap=Math.min(p.bottom,t.bottom)-Math.max(p.top,t.top);
     const centerYGap=Math.abs(p.cy-t.cy);
-    // V0.7.1: stricter combat tier. KAI đứng trên bệ/tường không còn chém xuyên xuống tầng dưới.
+    // V0.8.0: stricter combat tier. KAI đứng trên bệ/tường không còn chém xuyên xuống tầng dưới.
     const footGap=Math.abs(p.bottom-t.bottom);
     const sameCombatLevel=(verticalOverlap>=16 || centerYGap<=verticalGapLimit) && footGap<=46;
     if(!inFront||frontGap>reach||frontGap<-behindAllowance||!sameCombatLevel)return false;
@@ -1187,7 +1270,7 @@ class AdventureScene extends Phaser.Scene{
     ui.add(this.add.rectangle(18,18,350,62,0x061015,0.82).setOrigin(0));
     ui.add(this.add.image(47,49,'kaiPortrait').setDisplaySize(48,48));
     ui.add(this.add.text(82,27,'KAI',{fontSize:'16px',fontStyle:'bold',color:'#d8fffc'}));
-    this.hpBar=this.add.graphics();ui.add(this.hpBar);
+    this.hpBar=this.add.graphics();ui.add(this.hpBar);this.hpText=this.add.text(226,49,'100 / 100',{fontSize:'11px',fontStyle:'bold',color:'#eaffff',stroke:'#061015',strokeThickness:3}).setOrigin(.5);ui.add(this.hpText);
     this.objective=this.add.text(28,94,'OBJECTIVE: Solve seal puzzles, clear areas and build Relics',{fontSize:'16px',color:'#d8fffc',backgroundColor:'#061015aa',padding:{x:12,y:8}});ui.add(this.objective);
     ui.add(this.add.rectangle(386,18,455,108,0x061015,0.70).setOrigin(0));
     this.runText=this.add.text(402,28,'RUN ------ • 00:00',{fontSize:'15px',fontStyle:'bold',color:'#ffe6ad'});ui.add(this.runText);
@@ -1199,7 +1282,7 @@ class AdventureScene extends Phaser.Scene{
     this.relicHud.add(this.add.text(12,31,'Chưa có Relic • Hạ Elite để chọn sức mạnh đầu tiên',{fontSize:'12px',color:'#b7d4d2'}));
     ui.add(this.relicHud);
     this.coinText=this.add.text(W-220,25,'COIN 0',{fontSize:'18px',fontStyle:'bold',color:'#f7d77d'});ui.add(this.coinText);
-    this.skillText=this.add.text(W-220,52,'Skill READY',{fontSize:'14px',color:'#8ff8f0'}).setVisible(this.isMobileUI);ui.add(this.skillText);
+    this.skillText=this.add.text(W-220,52,'Skill READY',{fontSize:'14px',color:'#8ff8f0'}).setVisible(this.isMobileUI);ui.add(this.skillText);this.perfText=this.add.text(W-220,78,'QUALITY • -- FPS',{fontSize:'12px',fontStyle:'bold',color:'#8ff8f0',stroke:'#061015',strokeThickness:3}).setAlpha(.82);ui.add(this.perfText);
     this.bossLabel=this.add.text(W/2,20,'CORRUPTED FOREST GUARDIAN',{fontSize:'17px',fontStyle:'bold',color:'#ffd6d6'}).setOrigin(.5,0).setVisible(false);this.bossBar=this.add.graphics().setVisible(false);ui.add([this.bossLabel,this.bossBar]);
     this.status=this.add.text(W/2,115,'',{fontSize:'30px',fontStyle:'bold',color:'#fff',stroke:'#07171b',strokeThickness:7,align:'center'}).setOrigin(.5).setVisible(false);ui.add(this.status);
     this.pcHint=this.add.text(26,H-30,'PC: A/D hoặc ←/→ để di chuyển • SPACE/J/K/L dùng kỹ năng',{fontSize:'13px',color:'#89a5a4'}).setVisible(!this.isMobileUI);ui.add(this.pcHint);
@@ -1208,7 +1291,7 @@ class AdventureScene extends Phaser.Scene{
     this.createPcSkillDock(ui);
     this.applyResponsiveControls();
     this.scale.on('resize',()=>this.applyResponsiveControls());
-    this.drawUI();
+    this.drawUIOptimized(this.time.now,true);
   }
   detectMobileUI(){
     const ua = (navigator.userAgent || '').toLowerCase();
@@ -1233,7 +1316,7 @@ class AdventureScene extends Phaser.Scene{
     this.joy={baseX:130,baseY:H-118,radius:56,pointerId:null};
     const base=this.add.circle(130,H-118,56,0x103137,.28).setStrokeStyle(2,C.cyan,.22);
     const halo=this.add.circle(130,H-118,40,C.cyan,.035).setStrokeStyle(1,0xffffff,.04);
-    const knob=this.add.circle(130,H-118,28,0x1b4b52,.46).setStrokeStyle(2,0xffffff,.14);
+    const knob=this.add.circle(130,H-118,30,0x1b4b52,.40).setStrokeStyle(2,0xffffff,.14);
     const zone=this.add.circle(130,H-118,92,0,0.001).setInteractive();
     this.joy.base=base;this.joy.knob=knob;this.controlWidgets.push(base,halo,knob,zone);
     const start=p=>{if(!this.isMobileUI||this.relicChoiceOpen||this.ended||p.x>W*.45)return;this.joy.pointerId=p.id;this.updateJoy(p);base.setScale(1.04);knob.setScale(1.06)};
@@ -1249,7 +1332,7 @@ class AdventureScene extends Phaser.Scene{
       const inner=this.add.circle(x,y,r-10,accent,.08);
       const icon=this.add.image(x,y,key).setDisplaySize(r*1.08,r*1.08);
       const txt=this.add.text(x,y+r+13,label,{fontSize:'13px',fontStyle:'bold',color:'#eaffff',stroke:'#061015',strokeThickness:4}).setOrigin(.5);
-      const hit=this.add.zone(x,y,(r+20)*2,(r+20)*2).setOrigin(.5).setInteractive({useHandCursor:true});
+      const hit=this.add.zone(x,y,(r+30)*2,(r+30)*2).setOrigin(.5).setInteractive({useHandCursor:true});
       hit.on('pointerdown',(pointer,localX,localY,event)=>{this.stopUiEvent(event);if(!this.isMobileUI)return;this.inputState[field]=true;ring.setScale(.95);inner.setScale(.92);icon.setScale(.92)});
       const rel=(pointer,localX,localY,event)=>{this.stopUiEvent(event);this.inputState[field]=false;ring.setScale(1);inner.setScale(1);icon.setScale(1)};
       hit.on('pointerup',rel);hit.on('pointerupoutside',rel);hit.on('pointerout',rel);
@@ -1271,7 +1354,7 @@ class AdventureScene extends Phaser.Scene{
     ];
     const dockBg=this.add.rectangle(W/2,H-52,390,88,0x061015,.38).setStrokeStyle(1,C.bronze,.16);
     ui.add(dockBg);
-    const dockTitle=this.add.text(W/2,H-94,'COMBAT SKILLS',{fontSize:'10px',fontStyle:'bold',color:'#8ff8f0'}).setOrigin(.5).setAlpha(.75);
+    const dockTitle=this.add.text(W/2,H-94,'COMBAT SKILLS • V0.8 POLISH',{fontSize:'10px',fontStyle:'bold',color:'#8ff8f0'}).setOrigin(.5).setAlpha(.75);
     ui.add(dockTitle);
     for(const cfg of slots){
       const y=H-52;
@@ -1313,14 +1396,40 @@ class AdventureScene extends Phaser.Scene{
   }
   updateJoy(p){const dx=p.x-130,dy=p.y-(H-118),d=Math.hypot(dx,dy)||1,m=Math.min(d,56);this.joy.knob.x=130+dx/d*m;this.joy.knob.y=H-118+dy/d*m;this.joystickX=Phaser.Math.Clamp((dx/d*m)/56,-1,1)} resetJoy(){this.joy.pointerId=null;this.joystickX=0;this.joy.knob.setPosition(130,H-118)}
   consume(field,key){const t=this.inputState[field];if(t)this.inputState[field]=false;return !!t||!!(key&&Phaser.Input.Keyboard.JustDown(key))}
-  update(time){this.updateEnvironmentPolish(time);if(this.ended){if(this.keys&&Phaser.Input.Keyboard.JustDown(this.keys.restart))this.scene.restart();this.updateControlCooldowns(time);this.drawUI();return}if(this.relicChoiceOpen){this.handleRelicChoiceKeys();this.updateControlCooldowns(time);this.drawUI();return}this.updateRunSystem(time);this.handlePlayer(time);this.updatePlayerVisual(time);this.updateEnemies();this.keepActorsAboveFloor();this.updateAdventure(time);this.updateBoss(time);this.drawUI();this.updateControlCooldowns(time);const rem=Math.max(0,this.skillReadyAt-time);if(this.skillText)this.skillText.setText(rem<=0?'Skill READY':`Skill ${(rem/1000).toFixed(1)}s`)}
+  update(time){
+    this.updateEnvironmentPolish(time);
+    this.updatePerformanceMetrics(time);
+    if(this.ended){
+      if(this.keys&&Phaser.Input.Keyboard.JustDown(this.keys.restart)){this.clearTransientFx();this.scene.restart();}
+      this.updateControlCooldowns(time);
+      this.drawUIOptimized(time,true);
+      return;
+    }
+    if(this.relicChoiceOpen){
+      this.handleRelicChoiceKeys();
+      this.updateControlCooldowns(time);
+      this.drawUIOptimized(time,true);
+      return;
+    }
+    this.updateRunSystem(time);
+    this.handlePlayer(time);
+    this.updatePlayerVisual(time);
+    this.updateEnemies();
+    this.keepActorsAboveFloor();
+    this.updateAdventure(time);
+    this.updateBoss(time);
+    this.drawUIOptimized(time);
+    this.updateControlCooldowns(time);
+    const rem=Math.max(0,this.skillReadyAt-time);
+    if(this.skillText)this.skillText.setText(rem<=0?'Skill READY':`Skill ${(rem/1000).toFixed(1)}s`);
+  }
   handleRelicChoiceKeys(){if(!this.keys||!this.relicChoiceOpen||!this.relicChoices)return;let idx=-1;if(Phaser.Input.Keyboard.JustDown(this.keys.choice1))idx=0;else if(Phaser.Input.Keyboard.JustDown(this.keys.choice2))idx=1;else if(Phaser.Input.Keyboard.JustDown(this.keys.choice3))idx=2;if(idx>=0&&this.relicChoices[idx]){const c=this.relicChoices[idx];this.selectRelic(c.id,c.source);}}
   handlePlayer(time){const b=this.player.body,left=this.joystickX<-.25||this.keys?.left.isDown||this.keys?.left2.isDown,right=this.joystickX>.25||this.keys?.right.isDown||this.keys?.right2.isDown;if(!this.isDashing){if(left){this.player.setVelocityX(-250);this.facing=-1;this.player.setFlipX(true)}else if(right){this.player.setVelocityX(250);this.facing=1;this.player.setFlipX(false)}else this.player.setVelocityX(0)}if(this.consume('jump',this.keys?.jump)&&b.blocked.down)this.player.setVelocityY(-510);if(this.consume('dash',this.keys?.dash)&&this.canDash)this.doDash(time);if(this.consume('attack',this.keys?.attack)&&this.canAttack)this.attack(time);if(this.consume('skill',this.keys?.skill)&&time>=this.skillReadyAt)this.skill(time)}
   doDash(time){const cd=this.getDashCooldown(),speed=this.hasRelic('wind_step')?760:650;this.canDash=false;this.dashReadyAt=time+cd;this.isDashing=true;this.invincibleUntil=time+190;this.animLockUntil=time+210;this.setKaiTexture(this.kaiTex.dash);this.player.setVelocityX(this.facing*speed).setTint(C.cyan);this.createDashTrail();if(this.hasRelic('thunder_dash')){this.applyThunderDash();this.time.delayedCall(110,()=>this.applyThunderDash());this.time.delayedCall(210,()=>this.applyThunderDash());}this.time.delayedCall(190,()=>{this.isDashing=false;this.player.clearTint()});this.time.delayedCall(cd,()=>this.canDash=true)}
   attack(time){this.canAttack=false;if(time>this.comboExpire)this.attackStep=0;this.attackStep=this.attackStep%3+1;if(this.runStats)this.runStats.bestCombo=Math.max(this.runStats.bestCombo,this.attackStep);this.comboExpire=time+520;const atkCd=this.attackStep===3?285:185;this.attackReadyAt=time+atkCd;this.animLockUntil=time+(this.attackStep===3?255:175);this.setKaiTexture(this.kaiTex['attack'+this.attackStep]);let dmg=[0,12,15,25][this.attackStep];if(this.hasRelic('heavy_impact')&&this.attackStep===3)dmg+=14;const reach=this.attackStep===3?96:74;this.fxSlash(this.player.x+this.facing*52,this.player.y-5,this.attackStep===3?1.22:0.96);for(const e of this.enemies){const yGap=e.type==='elite'?18:10;const behind=e.type==='elite'?34:18;if(e.active&&this.canMeleeHit(e.sprite,reach+(e.type==='elite'?38:20),yGap,behind)){this.hitEnemy(e,dmg);if(this.hasRelic('fire_blade')&&Math.random()<0.28)this.applyBurn(e);if(this.hasRelic('heavy_impact')&&this.attackStep===3)this.bindEnemy(e,560);}}if(this.bossActive&&this.boss.active&&this.canMeleeHit(this.boss,reach+98,30,58)){this.hitBoss(dmg);if(this.hasRelic('fire_blade')&&Math.random()<0.28)this.applyBossBurn();if(this.hasRelic('heavy_impact')&&this.attackStep===3)this.bossSlowUntil=this.time.now+560;}this.time.delayedCall(atkCd,()=>this.canAttack=true)}
   skill(time){const cd=this.getSkillCooldown();this.skillReadyAt=time+cd;this.animLockUntil=time+360;this.setKaiTexture(this.kaiTex.skill);this.createSkillBurst(this.player.x+this.facing*50,this.player.y);const surge=this.hasRelic('relic_surge'),root=this.hasRelic('root_prison');const wave=this.physics.add.sprite(this.player.x+this.facing*55,this.player.y-6,this.textures.exists('vfxSlashCrescent')?'vfxSlashCrescent':'slash').setScale(surge?1.75:1.4,surge?2.95:2.5).setTint(root?0x6fff9a:0x8effff);wave.body.setAllowGravity(false);wave.setVelocityX(this.facing*(surge?820:720));const ev=this.time.addEvent({delay:35,repeat:22,callback:()=>{if(!wave.active)return;for(const e of this.enemies){if(e.active&&Phaser.Math.Distance.Between(wave.x,wave.y,e.sprite.x,e.sprite.y)<(surge?92:75)){this.hitEnemy(e,surge?48:34);if(root)this.bindEnemy(e,1800);wave.destroy();return}}if(this.bossActive&&this.boss.active&&Phaser.Math.Distance.Between(wave.x,wave.y,this.boss.x,this.boss.y)<(surge?130:110)){this.hitBoss(surge?48:34);if(root){this.bossSlowUntil=this.time.now+1800;this.createRootFx(this.boss.x,this.boss.y+42);}wave.destroy()}}});this.time.delayedCall(1050,()=>{ev.remove();if(wave.active)wave.destroy()})}
   fxSlash(x,y,s=1){const key=this.textures.exists('vfxSlashCrescent')?'vfxSlashCrescent':'slash';const q=this.add.sprite(x,y,key).setDepth(15).setScale(this.facing>0?s*0.72:-s*0.72,s*0.72).setAlpha(.9);if(key==='slash')q.setScale(s,1.5*s).setTint(C.cyan);const arc=this.add.graphics({x,y}).setDepth(16);arc.lineStyle(5*s,0x8effff,.65);arc.beginPath();arc.arc(0,0,60*s,this.facing>0?-0.8:Math.PI-0.8,this.facing>0?0.8:Math.PI+0.8,false);arc.strokePath();arc.lineStyle(2*s,0xffffff,.85);arc.beginPath();arc.arc(0,0,73*s,this.facing>0?-0.55:Math.PI-0.55,this.facing>0?0.55:Math.PI+0.55,false);arc.strokePath();this.tweens.add({targets:q,alpha:0,scaleX:q.scaleX*1.22,scaleY:q.scaleY*1.22,duration:155,onComplete:()=>q.destroy()});this.tweens.add({targets:arc,alpha:0,scale:1.35,duration:190,onComplete:()=>arc.destroy()})}
-  hitEnemy(e,dmg){if(!e.active)return;const dealt=Math.min(dmg,e.hp);e.hp-=dmg;if(this.runStats)this.runStats.damageDealt+=dealt;this.setEnemyTexture(e,'hurt');e.sprite.setTint(0xffffff);this.cameras.main.shake(45,.0025);this.createImpactSpark(e.sprite.x,e.sprite.y-18,e.type==='elite'?C.gold:C.cyan);this.time.delayedCall(90,()=>{if(e.active){e.sprite.clearTint();this.setEnemyTexture(e,'idle');}});if(e.hp<=0){e.active=false;this.recordKill(e.type);e.sprite.body.enable=false;this.setEnemyTexture(e,'death');e.sprite.clearTint();this.tweens.add({targets:e.sprite,alpha:0,y:e.sprite.y-16,scale:e.type==='elite'?0.92:0.88,duration:360,onComplete:()=>e.sprite.disableBody(true,true)});const reward=e.type==='elite'?30:10;this.addCoins(reward);this.spawnCoinText(e.sprite.x,e.sprite.y,reward);this.createDeathBurst(e.sprite.x,e.sprite.y-14,e.type==='elite'?C.gold:C.cyan);if(this.hasRelic('blood_pact'))this.healPlayer(e.type==='elite'?16:7);this.tryGrantAreaReward(e.areaId);if(e.type==='elite'){this.flash('ELITE DEFEATED • RELIC FOUND',900);if(!this.eliteRelicDropped){this.eliteRelicDropped=true;this.time.delayedCall(420,()=>this.showRelicChoices('elite'));}}}}
+  hitEnemy(e,dmg){if(!e.active)return;const dealt=Math.min(dmg,e.hp);e.hp-=dmg;if(this.runStats)this.runStats.damageDealt+=dealt;this.setEnemyTexture(e,'hurt');e.sprite.setTint(0xffffff);this.polishShake(45,.0025);this.createImpactSpark(e.sprite.x,e.sprite.y-18,e.type==='elite'?C.gold:C.cyan);this.time.delayedCall(90,()=>{if(e.active){e.sprite.clearTint();this.setEnemyTexture(e,'idle');}});if(e.hp<=0){e.active=false;this.recordKill(e.type);e.sprite.body.enable=false;this.setEnemyTexture(e,'death');e.sprite.clearTint();this.tweens.add({targets:e.sprite,alpha:0,y:e.sprite.y-16,scale:e.type==='elite'?0.92:0.88,duration:360,onComplete:()=>e.sprite.disableBody(true,true)});const reward=e.type==='elite'?30:10;this.addCoins(reward);this.spawnCoinText(e.sprite.x,e.sprite.y,reward);this.createDeathBurst(e.sprite.x,e.sprite.y-14,e.type==='elite'?C.gold:C.cyan);if(this.hasRelic('blood_pact'))this.healPlayer(e.type==='elite'?16:7);this.tryGrantAreaReward(e.areaId);if(e.type==='elite'){this.flash('ELITE DEFEATED • RELIC FOUND',900);if(!this.eliteRelicDropped){this.eliteRelicDropped=true;this.time.delayedCall(420,()=>this.showRelicChoices('elite'));}}}}
   updatePlayerVisual(time){
     if(this.ended){this.setKaiTexture(this.kaiTex.death);return}
     this.player.setFlipX(this.facing<0);
@@ -1335,19 +1444,24 @@ class AdventureScene extends Phaser.Scene{
     this.setKaiTexture(tex);
   }
   createDashTrail(){
+    if(!this.canSpawnFx('dashTrail',50))return;
     if(this.textures.exists('vfxDashTrail')){
-      const tr=this.add.image(this.player.x-this.facing*54,this.player.y+2,'vfxDashTrail').setDepth(13).setAlpha(0.58).setScale(this.facing>0?0.68:-0.68,0.68);
-      this.tweens.add({targets:tr,alpha:0,x:tr.x-this.facing*92,scaleX:tr.scaleX*1.35,duration:260,onComplete:()=>tr.destroy()});
+      const tr=this.trackFx(this.add.image(this.player.x-this.facing*54,this.player.y+2,'vfxDashTrail').setDepth(13).setAlpha(0.52).setScale(this.facing>0?0.64:-0.64,0.64),340);
+      this.tweens.add({targets:tr,alpha:0,x:tr.x-this.facing*92,scaleX:tr.scaleX*1.28,duration:240,onComplete:()=>tr.destroy()});
     }
-    for(let i=0;i<3;i++){
-      const ghost=this.add.image(this.player.x-this.facing*(18+i*18),this.player.y,(this.kaiTex.runFrames||[this.kaiTex.run])[i%((this.kaiTex.runFrames||[this.kaiTex.run]).length)]).setAlpha(0.22-i*0.045).setTint(C.cyan).setFlipX(this.facing<0).setDepth(this.player.depth-1);
-      this.tweens.add({targets:ghost,alpha:0,x:ghost.x-this.facing*34,duration:220+i*40,onComplete:()=>ghost.destroy()});
+    const count=this.quality?.lowFxMode?1:3;
+    for(let i=0;i<count;i++){
+      const frames=this.kaiTex.runFrames||[this.kaiTex.run];
+      const ghost=this.trackFx(this.add.image(this.player.x-this.facing*(18+i*18),this.player.y,frames[i%frames.length]).setAlpha(0.18-i*0.045).setTint(C.cyan).setFlipX(this.facing<0).setDepth(this.player.depth-1),360);
+      this.tweens.add({targets:ghost,alpha:0,x:ghost.x-this.facing*34,duration:200+i*40,onComplete:()=>ghost.destroy()});
     }
   }
   createSkillBurst(x,y){
-    const burst=this.add.graphics({x,y}).setDepth(12);
+    if(!this.canSpawnFx('skillBurst',70))return;
+    const burst=this.trackFx(this.add.graphics({x,y}).setDepth(12),520);
     burst.lineStyle(4,C.cyan,0.9);burst.strokeCircle(0,0,24);burst.lineStyle(2,0xeaffff,0.8);burst.strokeCircle(0,0,38);
-    this.tweens.add({targets:burst,scale:1.7,alpha:0,duration:360,onComplete:()=>burst.destroy()});
+    if(!this.quality?.lowFxMode){burst.lineStyle(1,0xffffff,0.6);burst.strokeCircle(0,0,52);}
+    this.tweens.add({targets:burst,scale:this.quality?.lowFxMode?1.35:1.7,alpha:0,duration:330,onComplete:()=>burst.destroy()});
   }
   updateEnemies(){for(const e of this.enemies){if(!e.active)continue;if(this.boundUntil[e.id]&&this.time.now<this.boundUntil[e.id]){e.sprite.setVelocityX(0);this.setEnemyTexture(e,'idle');continue;}const d=this.player.x-e.sprite.x;if(Math.abs(d)<390){e.sprite.setVelocityX(Math.sign(d)*e.speed);e.sprite.setFlipX(d<0);this.setEnemyTexture(e,e.type==='elite'&&Math.abs(d)<95?'attack':'move');}else{e.sprite.setVelocityX(0);this.setEnemyTexture(e,'idle');}}}
   keepActorsAboveFloor(){for(const e of this.enemies){if(!e.active)continue;if(e.sprite.y>e.floorY+4){e.sprite.setY(e.floorY);e.sprite.setVelocityY(0)}}if(this.boss&&this.boss.active&&this.boss.y>FLOOR_TOP-76){this.boss.setY(FLOOR_TOP-76);this.boss.setVelocityY(0)}}
@@ -1371,12 +1485,32 @@ class AdventureScene extends Phaser.Scene{
   startBoss(){this.bossActive=true;this.boss.setVisible(true).setActive(true);this.boss.body.enable=true;this.setBossTexture('idle');this.bossLabel.setVisible(true);this.bossBar.setVisible(true);this.bossNextAttack=this.time.now+1200;this.objective.setText('OBJECTIVE: Defeat the Forest Guardian');this.flash('BOSS ENCOUNTER',900)}
   updateBoss(time){if(!this.bossActive||!this.boss.active||this.bossBusy)return;if(this.bossHP<=this.bossMaxHP*0.45&&this.bossPhase===1){this.bossPhase=2;this.setBossTexture('rage');this.boss.setTint(0xff7777);this.createDeathBurst(this.boss.x,this.boss.y-40,C.red);this.flash('PHASE 2 • RAGE',1000)}if(time<this.bossNextAttack)return;const c=Phaser.Math.Between(0,2);c===0?this.bossCharge():c===1?this.bossSlam():this.bossRoots();const slowed=time<this.bossSlowUntil;this.bossNextAttack=time+(this.bossPhase===1?(slowed?2950:2200):(slowed?2200:1580))}
   bossCharge(){this.bossBusy=true;this.setBossTexture('charge');const dir=Math.sign(this.player.x-this.boss.x)||-1,w=this.createBossWarning(this.boss.x+dir*220,625,420,54,'charge');this.time.delayedCall(540,()=>{w.destroy();this.boss.setVelocityX(dir*(this.bossPhase===1?450:585));this.time.delayedCall(450,()=>{this.boss.setVelocityX(0);this.setBossTexture(this.bossPhase===2?'rage':'idle');this.bossBusy=false})})}
-  bossSlam(){this.bossBusy=true;this.setBossTexture('slam');const z=this.add.circle(this.boss.x,640,150,C.warning,.18).setDepth(17);this.tweens.add({targets:z,scale:1.18,alpha:.55,duration:500});this.time.delayedCall(600,()=>{this.cameras.main.shake(180,.008);this.createGroundCrack(this.boss.x,646);if(Phaser.Math.Distance.Between(this.player.x,this.player.y,this.boss.x,this.boss.y)<180)this.takeDamage(this.bossPhase===1?15:20);z.destroy();this.time.delayedCall(350,()=>{this.setBossTexture(this.bossPhase===2?'rage':'idle');this.bossBusy=false})})}
+  bossSlam(){this.bossBusy=true;this.setBossTexture('slam');const z=this.add.circle(this.boss.x,640,150,C.warning,.18).setDepth(17);this.tweens.add({targets:z,scale:1.18,alpha:.55,duration:500});this.time.delayedCall(600,()=>{this.polishShake(180,.008);this.createGroundCrack(this.boss.x,646);if(Phaser.Math.Distance.Between(this.player.x,this.player.y,this.boss.x,this.boss.y)<180)this.takeDamage(this.bossPhase===1?15:20);z.destroy();this.time.delayedCall(350,()=>{this.setBossTexture(this.bossPhase===2?'rage':'idle');this.bossBusy=false})})}
   bossRoots(){this.bossBusy=true;this.setBossTexture('root');const x=Phaser.Math.Clamp(this.player.x+Phaser.Math.Between(-80,80),3550,4230),w=this.createBossWarning(x,630,130,36,'root');this.time.delayedCall(650,()=>{w.destroy();this.createRootFx(x,610);const r=this.add.rectangle(x,575,46,130,0x6f8f45,0.42).setOrigin(.5,1).setDepth(16);if(Math.abs(this.player.x-x)<65)this.takeDamage(this.bossPhase===1?16:22);this.time.delayedCall(500,()=>r.destroy());this.time.delayedCall(680,()=>{this.setBossTexture(this.bossPhase===2?'rage':'idle');this.bossBusy=false})})}
-  hitBoss(dmg){const dealt=Math.min(dmg,this.bossHP);this.bossHP=Math.max(0,this.bossHP-dmg);if(this.runStats)this.runStats.damageDealt+=dealt;this.boss.setTint(0xffffff);this.cameras.main.shake(55,.003);this.createImpactSpark(this.boss.x,this.boss.y-22,this.bossPhase===2?C.red:C.cyan);this.time.delayedCall(80,()=>{if(this.boss.active){this.bossPhase===2?this.boss.setTint(0xff7777):this.boss.clearTint();if(!this.bossBusy)this.setBossTexture(this.bossPhase===2?'rage':'idle');}});if(this.bossHP<=0){if(this.runStats)this.runStats.bossDefeated=true;this.setBossTexture('death');this.boss.body.enable=false;this.createDeathBurst(this.boss.x,this.boss.y-40,C.red);this.tweens.add({targets:this.boss,alpha:0,scale:0.92,duration:520,onComplete:()=>this.boss.disableBody(true,true)});if(this.hasRelic('blood_pact'))this.healPlayer(30);if(!this.bossRelicDropped){this.bossRelicDropped=true;this.flash('BOSS DEFEATED • ANCIENT RELIC UNLOCKED',1100);this.time.delayedCall(550,()=>this.showRelicChoices('boss'));}else this.openPortalAfterRelic();}}
+  hitBoss(dmg){const dealt=Math.min(dmg,this.bossHP);this.bossHP=Math.max(0,this.bossHP-dmg);if(this.runStats)this.runStats.damageDealt+=dealt;this.boss.setTint(0xffffff);this.polishShake(55,.003);this.createImpactSpark(this.boss.x,this.boss.y-22,this.bossPhase===2?C.red:C.cyan);this.time.delayedCall(80,()=>{if(this.boss.active){this.bossPhase===2?this.boss.setTint(0xff7777):this.boss.clearTint();if(!this.bossBusy)this.setBossTexture(this.bossPhase===2?'rage':'idle');}});if(this.bossHP<=0){if(this.runStats)this.runStats.bossDefeated=true;this.setBossTexture('death');this.boss.body.enable=false;this.createDeathBurst(this.boss.x,this.boss.y-40,C.red);this.tweens.add({targets:this.boss,alpha:0,scale:0.92,duration:520,onComplete:()=>this.boss.disableBody(true,true)});if(this.hasRelic('blood_pact'))this.healPlayer(30);if(!this.bossRelicDropped){this.bossRelicDropped=true;this.flash('BOSS DEFEATED • ANCIENT RELIC UNLOCKED',1100);this.time.delayedCall(550,()=>this.showRelicChoices('boss'));}else this.openPortalAfterRelic();}}
   contactDamage(enemy,dmg){if(this.time.now<this.invincibleUntil)return;this.takeDamage(dmg);this.player.setVelocityX(Math.sign(this.player.x-enemy.x)*260);this.player.setVelocityY(-180)}
-  takeDamage(dmg){if(this.time.now<this.invincibleUntil||this.ended)return;if(this.hasRelic('guardian_shell'))dmg=Math.ceil(dmg*0.78);if(this.runStats)this.runStats.damageTaken+=dmg;this.playerHP=Math.max(0,this.playerHP-dmg);this.invincibleUntil=this.time.now+700;this.hurtUntil=this.time.now+350;this.setKaiTexture(this.kaiTex.hurt);this.player.setTint(0xff7777);this.cameras.main.shake(100,.006);this.showDamageText(this.player.x,this.player.y-54,dmg,0xff6b6b,'-');this.time.delayedCall(150,()=>this.player.clearTint());if(this.playerHP<=0){this.setKaiTexture(this.kaiTex.death);this.flash('KAI FALLEN • RUN FAILED',900);this.time.delayedCall(450,()=>this.finishRun(false));}}
-  drawUI(){this.hpBar.clear().fillStyle(0x183434,.95).fillRoundedRect(118,40,218,18,8).fillStyle(C.green,1).fillRoundedRect(118,40,218*(this.playerHP/100),18,8);this.coinText.setText(`COIN ${this.coins}`);this.bossBar.clear().fillStyle(0x26161a,.95).fillRoundedRect(W/2-280,50,560,16,8).fillStyle(C.red,1).fillRoundedRect(W/2-280,50,560*(this.bossHP/this.bossMaxHP),16,8);this.updateRelicHud();this.updatePuzzleHud&&this.updatePuzzleHud();if(this.cloudSaveText&&this.cloudSave)this.setCloudSaveStatus(this.cloudSave.status||'SAVE: LOCAL')}
+  takeDamage(dmg){if(this.time.now<this.invincibleUntil||this.ended)return;if(this.hasRelic('guardian_shell'))dmg=Math.ceil(dmg*0.78);if(this.runStats)this.runStats.damageTaken+=dmg;this.playerHP=Math.max(0,this.playerHP-dmg);this.invincibleUntil=this.time.now+700;this.hurtUntil=this.time.now+350;this.setKaiTexture(this.kaiTex.hurt);this.player.setTint(0xff7777);this.polishShake(100,.006);this.showDamageText(this.player.x,this.player.y-54,dmg,0xff6b6b,'-');this.time.delayedCall(150,()=>this.player.clearTint());if(this.playerHP<=0){this.setKaiTexture(this.kaiTex.death);this.flash('KAI FALLEN • RUN FAILED',900);this.time.delayedCall(450,()=>this.finishRun(false));}}
+  drawUI(){
+    const hpPct=Phaser.Math.Clamp(this.playerHP/100,0,1);
+    this.hpBar.clear()
+      .fillStyle(0x183434,.95).fillRoundedRect(118,40,218,18,8)
+      .fillStyle(hpPct>.45?C.green:(hpPct>.22?C.gold:C.red),1).fillRoundedRect(118,40,218*hpPct,18,8)
+      .lineStyle(1,0xeaffff,.25).strokeRoundedRect(118,40,218,18,8);
+    if(this.hpText)this.hpText.setText(`${Math.round(this.playerHP)} / 100`);
+    this.coinText.setText(`COIN ${this.coins}`);
+    this.bossBar.clear()
+      .fillStyle(0x26161a,.95).fillRoundedRect(W/2-280,50,560,16,8)
+      .fillStyle(this.bossPhase===2?0xff5d5d:C.red,1).fillRoundedRect(W/2-280,50,560*(this.bossHP/this.bossMaxHP),16,8)
+      .lineStyle(1,0xffffff,.18).strokeRoundedRect(W/2-280,50,560,16,8);
+    this.updateRelicHud();
+    this.updatePuzzleHud&&this.updatePuzzleHud();
+    if(this.cloudSaveText&&this.cloudSave){
+      const q=this.cloudSave?.queueCount||0;
+      const suffix=q>0?` • Q${q}`:'';
+      const text=`${this.cloudSave.status||'SAVE: LOCAL'}${suffix}`;
+      if(this.cloudSaveText.text!==text)this.cloudSaveText.setText(text);
+    }
+  }
   hasRelic(id){return this.relics.includes(id)}
   getDashCooldown(){return this.hasRelic('wind_step')?520:720}
   getSkillCooldown(){return this.hasRelic('relic_surge')?3400:4700}
@@ -1386,29 +1520,55 @@ class AdventureScene extends Phaser.Scene{
   applyBossBurn(){if(!this.boss.active)return;this.createBurnFx(this.boss.x,this.boss.y);let ticks=0;const ev=this.time.addEvent({delay:650,repeat:3,callback:()=>{if(!this.boss.active){ev.remove();return}ticks++;this.hitBoss(5);this.createBurnFx(this.boss.x,this.boss.y);if(ticks>=4)ev.remove();}})}
   bindEnemy(e,ms){if(!e||!e.active)return;this.boundUntil[e.id]=this.time.now+ms;e.sprite.setVelocityX(0);e.sprite.setTint(0x8dff9c);this.createRootFx(e.sprite.x,e.sprite.y+18);this.time.delayedCall(ms,()=>{if(e.active)e.sprite.clearTint()})}
   applyThunderDash(){for(const e of this.enemies){if(e.active&&Phaser.Math.Distance.Between(this.player.x,this.player.y,e.sprite.x,e.sprite.y)<92){this.hitEnemy(e,22);this.createLightningFx(e.sprite.x,e.sprite.y);}}if(this.bossActive&&this.boss.active&&Phaser.Math.Distance.Between(this.player.x,this.player.y,this.boss.x,this.boss.y)<130){this.hitBoss(18);this.createLightningFx(this.boss.x,this.boss.y);}}
-  createBurnFx(x,y){const fx=this.add.circle(x,y-18,20,0xff7138,0.22).setDepth(14);const ember=this.add.circle(x+Phaser.Math.Between(-8,8),y-34,5,0xffc65c,0.75).setDepth(15);this.tweens.add({targets:fx,scale:1.9,alpha:0,duration:420,onComplete:()=>fx.destroy()});this.tweens.add({targets:ember,y:ember.y-36,alpha:0,duration:520,onComplete:()=>ember.destroy()})}
-  createLightningFx(x,y){const g=this.add.graphics({x,y}).setDepth(18);g.lineStyle(5,0x66e8ff,0.95);g.beginPath();g.moveTo(-34,-42);g.lineTo(2,-10);g.lineTo(-10,-2);g.lineTo(30,42);g.strokePath();g.lineStyle(2,0xffffff,0.8);g.beginPath();g.moveTo(-20,-34);g.lineTo(10,-2);g.lineTo(0,4);g.lineTo(24,35);g.strokePath();this.tweens.add({targets:g,alpha:0,scale:1.38,duration:330,onComplete:()=>g.destroy()})}
-  createRootFx(x,y){if(this.textures.exists('vfxRootVine')){const v=this.add.image(x,y-18,'vfxRootVine').setDepth(15).setAlpha(0.9).setScale(0.82);this.tweens.add({targets:v,alpha:0,y:v.y-18,scale:1.08,duration:760,onComplete:()=>v.destroy()});return;}const g=this.add.graphics({x,y}).setDepth(13);g.lineStyle(5,0x7cf082,0.8);for(let i=-2;i<=2;i++){g.beginPath();g.moveTo(i*12,30);g.lineTo(i*8,-22);g.lineTo(i*18,-40);g.strokePath();}this.tweens.add({targets:g,alpha:0,y:y-12,duration:720,onComplete:()=>g.destroy()})}
-  createImpactSpark(x,y,color=C.cyan){
-    if(this.textures.exists('vfxHitSpark')){
-      const sp=this.add.image(x,y,'vfxHitSpark').setDepth(20).setAlpha(0.9).setScale(0.55).setTint(color);
-      this.tweens.add({targets:sp,scale:1.05,alpha:0,angle:Phaser.Math.Between(-28,28),duration:290,onComplete:()=>sp.destroy()});
+  createBurnFx(x,y){
+    if(!this.canSpawnFx('burnFx',80))return;
+    const fx=this.trackFx(this.add.circle(x,y-18,20,0xff7138,0.20).setDepth(14),560);
+    const ember=this.trackFx(this.add.circle(x+Phaser.Math.Between(-8,8),y-34,5,0xffc65c,0.68).setDepth(15),620);
+    this.tweens.add({targets:fx,scale:this.quality?.lowFxMode?1.45:1.8,alpha:0,duration:360,onComplete:()=>fx.destroy()});
+    this.tweens.add({targets:ember,y:ember.y-32,alpha:0,duration:460,onComplete:()=>ember.destroy()});
+  }
+  createLightningFx(x,y){
+    if(!this.canSpawnFx('lightningFx',60))return;
+    const g=this.trackFx(this.add.graphics({x,y}).setDepth(18),420);
+    g.lineStyle(5,0x66e8ff,0.95);g.beginPath();g.moveTo(-34,-42);g.lineTo(2,-10);g.lineTo(-10,-2);g.lineTo(30,42);g.strokePath();
+    if(!this.quality?.lowFxMode){g.lineStyle(2,0xffffff,0.8);g.beginPath();g.moveTo(-20,-34);g.lineTo(10,-2);g.lineTo(0,4);g.lineTo(24,35);g.strokePath();}
+    this.tweens.add({targets:g,alpha:0,scale:1.28,duration:300,onComplete:()=>g.destroy()});
+  }
+  createRootFx(x,y){
+    if(!this.canSpawnFx('rootFx',90))return;
+    if(this.textures.exists('vfxRootVine')){
+      const v=this.trackFx(this.add.image(x,y-18,'vfxRootVine').setDepth(15).setAlpha(0.86).setScale(0.78),880);
+      this.tweens.add({targets:v,alpha:0,y:v.y-18,scale:1.02,duration:700,onComplete:()=>v.destroy()});
       return;
     }
-    const g=this.add.graphics({x,y}).setDepth(18);
-    g.lineStyle(3,color,0.92);
-    for(let i=0;i<8;i++){const a=(Math.PI*2/8)*i;g.beginPath();g.moveTo(Math.cos(a)*8,Math.sin(a)*8);g.lineTo(Math.cos(a)*Phaser.Math.Between(22,42),Math.sin(a)*Phaser.Math.Between(22,42));g.strokePath();}
-    g.fillStyle(0xffffff,0.75).fillCircle(0,0,8);
-    this.tweens.add({targets:g,scale:1.3,alpha:0,duration:260,onComplete:()=>g.destroy()});
+    const g=this.trackFx(this.add.graphics({x,y}).setDepth(13),880);
+    g.lineStyle(5,0x7cf082,0.8);
+    const strands=this.quality?.lowFxMode?1:2;
+    for(let i=-strands;i<=strands;i++){g.beginPath();g.moveTo(i*12,30);g.lineTo(i*8,-22);g.lineTo(i*18,-40);g.strokePath();}
+    this.tweens.add({targets:g,alpha:0,y:y-12,duration:680,onComplete:()=>g.destroy()});
   }
-  createDeathBurst(x,y,color=C.cyan){for(let i=0;i<10;i++){const p=this.add.circle(x,y,Phaser.Math.Between(2,5),color,0.75).setDepth(60);this.tweens.add({targets:p,x:x+Phaser.Math.Between(-52,52),y:y+Phaser.Math.Between(-46,20),alpha:0,scale:0.25,duration:420+Phaser.Math.Between(0,220),onComplete:()=>p.destroy()});}}
+  createImpactSpark(x,y,color=C.cyan){
+    if(!this.canSpawnFx('impactSpark',this.quality?.lowFxMode?80:35))return;
+    if(this.textures.exists('vfxHitSpark')){
+      const sp=this.trackFx(this.add.image(x,y,'vfxHitSpark').setDepth(20).setAlpha(0.85).setScale(0.52).setTint(color),420);
+      this.tweens.add({targets:sp,scale:this.quality?.lowFxMode?0.82:1.05,alpha:0,angle:Phaser.Math.Between(-28,28),duration:260,onComplete:()=>sp.destroy()});
+      return;
+    }
+    const g=this.trackFx(this.add.graphics({x,y}).setDepth(18),420);
+    g.lineStyle(3,color,0.92);
+    const rays=this.quality?.lowFxMode?5:8;
+    for(let i=0;i<rays;i++){const a=(Math.PI*2/rays)*i;g.beginPath();g.moveTo(Math.cos(a)*8,Math.sin(a)*8);g.lineTo(Math.cos(a)*Phaser.Math.Between(22,42),Math.sin(a)*Phaser.Math.Between(22,42));g.strokePath();}
+    g.fillStyle(0xffffff,0.75).fillCircle(0,0,7);
+    this.tweens.add({targets:g,scale:1.24,alpha:0,duration:240,onComplete:()=>g.destroy()});
+  }
+  createDeathBurst(x,y,color=C.cyan){if(!this.canSpawnFx('deathBurst',90))return;const count=this.quality?.lowFxMode?5:10;for(let i=0;i<count;i++){const p=this.trackFx(this.add.circle(x,y,Phaser.Math.Between(2,5),color,0.72).setDepth(60),760);this.tweens.add({targets:p,x:x+Phaser.Math.Between(-52,52),y:y+Phaser.Math.Between(-46,20),alpha:0,scale:0.25,duration:380+Phaser.Math.Between(0,180),onComplete:()=>p.destroy()});}}
   createRelicAcquireFx(color=C.cyan){
     const x=W/2,y=H/2;
     if(this.textures.exists('vfxRelicAcquireRing')){
-      const ring=this.add.image(x,y,'vfxRelicAcquireRing').setScrollFactor(0).setDepth(340).setAlpha(0.95).setTint(color).setScale(0.56);
+      const ring=this.trackFx(this.add.image(x,y,'vfxRelicAcquireRing').setScrollFactor(0).setDepth(340).setAlpha(0.95).setTint(color).setScale(0.56),820);
       this.tweens.add({targets:ring,scale:1.12,alpha:0,angle:25,duration:650,onComplete:()=>ring.destroy()});
     }
-    const g=this.add.graphics({x,y}).setScrollFactor(0).setDepth(341);
+    const g=this.trackFx(this.add.graphics({x,y}).setScrollFactor(0).setDepth(341),820);
     g.lineStyle(5,color,0.9).strokeCircle(0,0,42);
     g.lineStyle(2,0xffffff,0.8).strokeCircle(0,0,68);
     for(let i=0;i<16;i++){const a=(Math.PI*2/16)*i;g.lineStyle(2,color,0.65);g.beginPath();g.moveTo(Math.cos(a)*76,Math.sin(a)*76);g.lineTo(Math.cos(a)*112,Math.sin(a)*112);g.strokePath();}

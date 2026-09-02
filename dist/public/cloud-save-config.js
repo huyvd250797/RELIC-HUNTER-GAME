@@ -1,9 +1,9 @@
-// RELIC HUNTER V0.7.1 – Save Sync Fix & Offline Retry Config
-// Đã cấu hình theo Worker URL Boss deploy thành công.
-// Không chứa token/bí mật; đây chỉ là public API endpoint.
+// RELIC HUNTER V0.8.0 – Quality / Performance / Polish Config
+// Public endpoint only. Do not put Cloudflare API tokens here.
 window.RELIC_HUNTER_CLOUD = {
   enabled: true,
   apiBaseUrl: 'https://relic-hunter-cloud-save.huywork257.workers.dev',
   playerName: 'KAI',
-  retryIntervalMs: 12000
+  retryIntervalMs: 12000,
+  requestTimeoutMs: 7500
 };

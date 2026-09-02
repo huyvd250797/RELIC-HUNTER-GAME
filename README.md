@@ -1,45 +1,53 @@
-# RELIC HUNTER V0.7.1 – Save Sync Fix & Offline Retry
+# RELIC HUNTER V0.8.0 – Quality / Performance / Polish
 
-Bản này nâng cấp từ **V0.7.0 – Cloud Save + Workers + D1** và tập trung sửa/hoàn thiện phần lưu dữ liệu Cloudflare sau khi deploy thật.
+Bản này nâng cấp từ **V0.7.1 – Save Sync Fix & Offline Retry** và tập trung làm game ổn định, mượt và gần release hơn.
 
 ## Nội dung chính
 
-- Chống lưu trùng run ở localStorage.
-- Chống cộng trùng `player_progress` trên Cloudflare D1 khi retry cùng một run.
-- Thêm idempotency key cho mỗi run.
-- Thêm retry queue local `relic_hunter_sync_queue_v2`.
-- Tự retry khi:
-  - mở game lại
-  - trình duyệt online trở lại
-  - mỗi 12 giây nếu còn queue
-- Thêm timeout 8.5s cho request sync để tránh treo.
-- Thêm trạng thái sync rõ hơn trong HUD:
-  - `SAVE: CLOUD READY`
-  - `SAVE: SYNCING...`
-  - `SAVE: CLOUD SYNCED`
-  - `SAVE: LOCAL • RETRY QUEUE`
-  - `SAVE: OFFLINE • QUEUE`
-- Run Summary hiển thị thêm:
-  - Sync status
-  - Retry queue
-- Worker API hỗ trợ duplicate-safe save.
-- Worker API thêm route kiểm tra trạng thái sync:
-  - `GET /api/sync-status?runId=...`
+### 1. Performance polish
 
-## Cloud config
+- Thêm FX budget để tránh quá nhiều hiệu ứng tồn tại cùng lúc.
+- Tự bật **LOW FX mode** khi frame time cao hoặc nhiều VFX.
+- Dọn transient VFX khi kết thúc run/restart.
+- Giảm camera shake và particle khi máy yếu/mobile.
+- Throttle update HUD để giảm render text/graphics không cần thiết mỗi frame.
+- Tối ưu một số VFX:
+  - dash trail
+  - hit spark
+  - burn
+  - lightning
+  - root
+  - death burst
+  - ground crack
+  - boss warning
 
-File `public/cloud-save-config.js` đã được cấu hình theo Worker URL Boss đã deploy:
+### 2. UI / HUD polish
 
-```js
-window.RELIC_HUNTER_CLOUD = {
-  enabled: true,
-  apiBaseUrl: 'https://relic-hunter-cloud-save.huywork257.workers.dev',
-  playerName: 'KAI',
-  retryIntervalMs: 12000
-};
-```
+- HP bar có viền và đổi màu theo máu.
+- Thêm text HP `current / 100`.
+- Thêm trạng thái performance nhỏ: `QUALITY / LOW FX + FPS`.
+- Cloud Save HUD giảm cập nhật dư thừa.
+- Skill dock PC được polish label.
+- Mobile touch hitbox lớn hơn, dễ tap hơn.
 
-Nếu đổi Worker URL khác, sửa lại `apiBaseUrl`.
+### 3. Stability polish
+
+- Khi restart run, transient FX được clear trước.
+- Save Sync status không bị spam update liên tục.
+- Giữ nguyên retry queue/offline sync của V0.7.1.
+- Worker health trả thêm version/timestamp và header no-store.
+
+## Tính năng vẫn giữ nguyên
+
+- World 1 Content Expansion.
+- Puzzle seals: Moon / Thorn / Forest.
+- Root Gate logic.
+- Roguelite Run System.
+- Relic System.
+- Cloud Save + Workers + D1.
+- Offline retry queue.
+- KAI / Enemy / Boss sprite pipeline.
+- Environment & VFX Polish.
 
 ## Cách chạy game local
 
@@ -59,59 +67,44 @@ Nếu port bị chiếm:
 $env:PORT=5174; npm run dev
 ```
 
-## Cập nhật Cloudflare Worker
+## Deploy Worker Cloudflare
 
-Vào thư mục `worker`:
+Nếu Boss đã deploy V0.7.1 rồi, V0.8.0 không bắt buộc migration mới. Chỉ cần giữ lại `account_id` và `database_id` thật trong `worker/wrangler.toml`, sau đó:
 
 ```powershell
 cd worker
 npm install
-```
-
-Nếu đã có D1 database từ V0.7.0, chạy migration mới:
-
-```powershell
-npx wrangler d1 migrations apply relic-hunter-db --remote
-```
-
-Sau đó deploy Worker:
-
-```powershell
 npx wrangler deploy --config wrangler.toml
 ```
 
-Nếu `wrangler.toml` trong máy Boss đã có `database_id` và `account_id`, hãy giữ lại/copy sang file mới trước khi deploy.
-
-## Kiểm tra Worker
+Test Worker:
 
 ```powershell
 curl.exe https://relic-hunter-cloud-save.huywork257.workers.dev/api/health
 ```
 
-Kiểm tra bảng:
+Kết quả mong muốn có version:
 
-```powershell
-npx wrangler d1 execute relic-hunter-db --remote --command="SELECT name FROM sqlite_master WHERE type='table';"
+```json
+{
+  "ok": true,
+  "service": "relic-hunter-cloud-save",
+  "version": "0.8.0"
+}
 ```
 
-Kiểm tra run history:
+## Kiểm tra build
 
 ```powershell
-npx wrangler d1 execute relic-hunter-db --remote --command="SELECT * FROM run_history ORDER BY created_at DESC LIMIT 5;"
+node --check public/main.js
+node --check worker/src/index.js
+node build.js
 ```
-
-Kiểm tra progress không bị cộng trùng:
-
-```powershell
-npx wrangler d1 execute relic-hunter-db --remote --command="SELECT * FROM player_progress;"
-```
-
-## Ghi chú kỹ thuật
-
-V0.7.1 không yêu cầu người chơi đăng nhập. Player ID được tạo cục bộ bằng localStorage. Cloud save hiện dùng public Worker endpoint và D1, không lưu token trong frontend.
 
 ## Phiên bản tiếp theo
 
 ```text
-V0.8.0 – Quality / Performance / Polish
+V0.8.1 – Final Bug Fix Pass
 ```
+
+Bản tiếp theo nên tập trung test toàn bộ luồng trên PC/mobile, Cloudflare, restart run, puzzle flow, boss fight và save sync.

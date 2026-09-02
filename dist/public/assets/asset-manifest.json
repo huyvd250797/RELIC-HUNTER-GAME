@@ -1,6 +1,6 @@
 {
-  "version": "0.6.1",
-  "pipeline": "World 1 Puzzle Flow Fix & Difficulty Tuning",
+  "version": "0.8.0",
+  "pipeline": "Quality / Performance / Polish",
   "fallbackMode": "runtime_generated_textures",
   "characters": {
     "kai": {
@@ -126,5 +126,17 @@
     "thornSeal": "public/assets/maps/whispering-forest/props/puzzle-thorn-seal.png",
     "forestSeal": "public/assets/maps/whispering-forest/props/puzzle-forest-seal.png",
     "rootGateRule": "Root Gate opens only after Moon Seal + Thorn Seal + Forest Rune"
+  },
+  "quality": {
+    "fxBudget": {
+      "desktop": 46,
+      "mobile": 28
+    },
+    "uiDrawThrottleMs": {
+      "desktop": 48,
+      "mobile": 82
+    },
+    "lowFxMode": "auto when frame time is high",
+    "cloudSave": "local-first with retry queue"
   }
 }
